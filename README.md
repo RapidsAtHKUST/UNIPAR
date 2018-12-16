@@ -14,7 +14,7 @@ GCC 4.9+ with support of C11 features
 ## Run UNIPAR:
 ### Run on a single machine:
 
-./unipar -i &lt input file &gt -r &lt read length &gt -k &lt kmer length &gt -p &lt minimizer length &gt -n &lt number of partitions &gt -c &lt number of CPUs &gt -g &lt number of GPUs &gt -d &lt intermediate file directory &gt -o &lt unitig output directory &gt -t &lt cutoff threshold &gt
+./unipar -i &lt;input file&gt; -r &lt;read length&gt; -k &lt;kmer length&gt; -p &lt;minimizer length&gt; -n &lt;number of partitions&gt; -c &lt;number of CPUs&gt; -g &lt;number of GPUs&gt; -d &lt;intermediate file directory&gt; -o &lt;unitig output directory&gt; -t &lt;cutoff threshold&gt;
   
 ### Run with multi-process:
 mpirun -np 6 ./unipar [parameter options]
