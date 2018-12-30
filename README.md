@@ -14,7 +14,7 @@ GCC 4.9+ with support of C11 features
 ## Run UNIPAR:
 ### Run on a single machine:
 
-./unipar -i &lt;input file&gt; -r &lt;read length&gt; -k &lt;kmer length&gt; -p &lt;minimizer length&gt; -n &lt;number of partitions&gt; -c &lt;number of CPUs&gt; -g &lt;number of GPUs&gt; -d &lt;intermediate file directory&gt; -o &lt;unitig output directory&gt; -t &lt;cutoff threshold&gt;
+./unipar -i &lt;input file&gt; -r &lt;read length&gt; -k &lt;kmer length&gt; -n &lt;number of partitions&gt; -c &lt;number of CPUs&gt; -g &lt;number of GPUs&gt; -d &lt;intermediate file directory&gt; -o &lt;unitig output directory&gt; -t &lt;cutoff threshold&gt;
   
 ### Run with multi-process:
 mpirun -np 6 ./unipar [parameter options]
@@ -31,8 +31,6 @@ mpirun -np 6 ./unipar -i ./example/ecoli.fa -r 72 -k 27
 **-r** [*INT*]: read length, the first r number of base pairs in a read will be taken
 
 **-k** [*INT*]: kmer length, no longer than the  read length
-
-**-p** [*INT*]: [Optional] minimizer length, set to be an odd number of the ceil of 1/3 kmer length by default
 
 **-n** [*INT*]: [Optional] number of partitions, set to be 512 by default
 
@@ -54,6 +52,7 @@ Miminizer based partitioning files [*intermediate file*]
 De Bruijn subgraph files [optional]: 
 Users can choose to output constructed De Bruijn graph if they only needed the raw graph instead of the unitigs
 The number of subgraph files is a user defined parameter, and set to 512 by default
+Output of subgraph files is turned off by default
 
 unitig files [*this is the output results of UNIPAR*]: 
 The total number of unitig files equals to the total number of processors run with UNIPAR. Unitigs in all the files contributes to the final results.
