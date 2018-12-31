@@ -13,8 +13,11 @@ MPI library
 
 ## Build UNIPAR:
 mkdir build
+
 cd build
+
 cmake ..
+
 make
 
 ## Run UNIPAR:
