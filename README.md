@@ -27,9 +27,9 @@ mpirun -np 6 ./unipar [parameter options]
 
 ### A simple example:
 
-./unipar -i ./example/ecoli.fa -r 72 -k 27
+./unipar -i ./example/test.fa -r 36 -k 27
 
-mpirun -np 6 ./unipar -i ./example/ecoli.fa -r 72 -k 27
+mpirun -np 2 ./unipar -i ./example/test.fa -r 36 -k 27
 
 ### Parameter options:
 **-i** [*STRING*]: input file, either a fasta or a fastq file
