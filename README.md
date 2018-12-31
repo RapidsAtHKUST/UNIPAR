@@ -12,6 +12,10 @@ MPI library
 *tbb library* used for parallel sort and scan on CPU
 
 ## Build UNIPAR:
+git clone git@github.com:ShuangQiuac/UNIPAR.git
+
+cd &lt;PATH-TO-UNIPAR&gt;
+
 mkdir build
 
 cd build
