@@ -7,6 +7,8 @@ CUDA 3.5+
 
 GCC 4.9+
 
+MPI library
+
 *tbb library* used for parallel sort and scan on CPU
 
 ## Build UNIPAR:
