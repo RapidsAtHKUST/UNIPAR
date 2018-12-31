@@ -3,13 +3,17 @@ UNItig construction in PARallel for de novo assembly with CPUs and GPUs
 
 ## Pre-requisites:
 
-CUDA 3.5+ to support atomic features
+CUDA 3.5+
 
-GCC 4.9+ with support of C11 features
+GCC 4.9+
 
 *tbb library* used for parallel sort and scan on CPU
 
 ## Build UNIPAR:
+mkdir build
+cd build
+cmake ..
+make
 
 ## Run UNIPAR:
 ### Run on a single machine:
