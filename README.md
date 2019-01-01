@@ -16,7 +16,7 @@ MPI library
 ## Build UNIPAR:
 git clone git@github.com:ShuangQiuac/UNIPAR.git
 
-cd &lt;PATH-TO-UNIPAR&gt;
+cd &lt;PATH_TO_UNIPAR&gt;
 
 mkdir build
 
@@ -69,7 +69,7 @@ Users can choose to output constructed De Bruijn graph if they only needed the r
 The number of subgraph files is a user defined parameter, and set to 512 by default.
 Output of subgraph files is turned off by default.
 
-**Unitig files** [*this is the output results of UNIPAR*]: 
+**Unitig files** [*these are output results of UNIPAR*]: 
 The total number of unitig files equals to the total number of processors run with UNIPAR. 
 
 Unitigs in all the files contributes to the final results.
