@@ -1,5 +1,7 @@
 # UNIPAR
-UNItig construction in PARallel for de novo assembly with CPUs and GPUs
+**UNI**tig construction in **PAR**allel for de novo assembly
+
+UNIPAR is a fast assembly tool that use De Bruijn graph based algorithms to assemble short sequencing reads to long unitigs. It uses both CPUs and GPUs to run in parallel, and scales to multiple computer nodes in a cluster.
 
 ## Pre-requisites:
 
