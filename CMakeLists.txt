@@ -22,9 +22,6 @@ target_link_libraries(tbbsort PRIVATE ${TBB_LIBRARIES})
 if (MPI_FOUND)
 	message("${MPI_VERSION}, ${MPI_INCLUDE_DIRS}, ${MPI_LIBRARIES}")
 	include_directories(${MPI_INCLUDE_DIRS})
-else ()
-	set(MPI_LIBRARIES /home/sqiuac/usr/local/lib/libmpi.so)
-	set(MPI_INCLUDE_DIRS /home/sqiuac/usr/local/include)
 endif ()
 
 add_library(distribute SHARED distribute.c pio.c)
@@ -68,12 +65,8 @@ find_package("CUDA" REQUIRED)
 cuda_add_library(culib SHARED all2all.cu comm.cu contig.cu dbgraph.cu msp.cu preprocess.cu share.cu)
 
 link_directories(${CMAKE_BINARY_DIR}/hash) 
-target_link_libraries(unipar /home/sqiuac/.linuxbrew/lib/librt.so.1)   
 target_link_libraries(unipar ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(unipar tbbsort)
 target_link_libraries(unipar distribute)
 target_link_libraries(unipar hash)
 target_link_libraries(unipar culib)
-
-set_target_properties(unipar PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
