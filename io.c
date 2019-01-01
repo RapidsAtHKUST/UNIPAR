@@ -31,7 +31,7 @@ void usage (void)
 			"\t\t             set to be the maximum number of GPUs detected\n"
 			"\t-d [STRING]: [Optional] intermediate partitioning output directory, set to be ./partitions by default\n"
 			"\t-o [STRING]: [Optional] unitig output directory, set to be the current directory by default\n"
-			"\t-t [INT]: [Optional] The cutoff threshold for the number of kmer coverage, set to 2 by default\n\n\n");
+			"\t-t [INT]: [Optional] The cutoff threshold for the number of kmer coverage, set to 1 by default\n\n\n");
 }
 
 int get_opt (int argc, char * const argv[], char * input, int * r, int * k, int * p, int * n, int * c, int * g, \

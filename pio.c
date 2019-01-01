@@ -914,11 +914,6 @@ parse_data (char ** read_buffer, read_buf_t * reads, ull read_size, int turn, ch
 		coffset += unit_size;
 		rnum++;
 	}
-	if (roffset >= read_size_per_thread)
-	{
-//		printf ("thid: %d, roffset - read_size_per_thread = %lu\n", thid, roffset - read_size_per_thread);
-//		exit(0);
-	}
 
 	reads->offset[thid] = coffset;
 	rnums[turn][thid] = rnum;
@@ -1527,24 +1522,6 @@ write_graph (dbgraph_t * graph, int k)
 		}
 		local_countn++;
 
-/*		decode_kmer (&(nodes[i].kmer), line_buf, k);
-		write_offset += sprintf (write_buffer + write_offset, "%s\t", line_buf);
-
-		for (j = 0; j < 4; j++)
-		{
-			write_offset += sprintf (write_buffer + write_offset, "%c\t%d\t", rev_table[j], nodes[i].edge[j]);
-		}
-		for (; j < EDGE_DIC_SIZE; j++)
-		{
-			write_offset += sprintf (write_buffer + write_offset, "%c\t%d\t", rev_table[j - 4], nodes[i].edge[j]);
-		}
-		write_offset += sprintf (write_buffer + write_offset, "%u\n", nodes[i].rid);
-
-		if (write_offset + LINE * 2 >= write_size)
-		{
-			fwrite (write_buffer, sizeof(seq_t), write_offset, output);
-			write_offset = 0;
-		}*/
 	}
 	countn += local_countn;
 	total_edges += num_edges;
