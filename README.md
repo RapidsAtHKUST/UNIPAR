@@ -36,9 +36,9 @@ mpirun -np &lt;number of processes&gt; [host options] ./unipar [parameter option
 
 ### A simple example:
 
-./unipar -i ./example/test.fa -r 36 -k 27
+./unipar -i &lt;PATH_TO_UNIPAR&gt;/example/test.fa -r 36 -k 27
 
-mpirun -np 2 ./unipar -i ./example/test.fa -r 36 -k 27
+mpirun -np 2 ./unipar -i &lt;PATH_TO_UNIPAR&gt;/example/test.fa -r 36 -k 27
 
 ### Parameter options:
 **-i** [*STRING*]: input file, either a fasta or a fastq file
@@ -64,7 +64,7 @@ mpirun -np 2 ./unipar -i ./example/test.fa -r 36 -k 27
 
 Miminizer based partitioning files [*intermediate file*]
 
-De Bruijn subgraph files [optional]: 
+De Bruijn subgraph files [*optional*]: 
 Users can choose to output constructed De Bruijn graph if they only needed the raw graph instead of the unitigs.
 The number of subgraph files is a user defined parameter, and set to 512 by default.
 Output of subgraph files is turned off by default.
