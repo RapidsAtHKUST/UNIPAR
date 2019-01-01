@@ -3,13 +3,13 @@ UNItig construction in PARallel for de novo assembly with CPUs and GPUs
 
 ## Pre-requisites:
 
-CUDA 3.5+
+CUDA 5 or later, with GPU compute capability 3.0 or higher
 
-GCC 4.9+
+GCC 4.9 or later
 
 MPI library
 
-*tbb library* used for parallel sort and scan on CPU
+*tbb library* used for parallel sort and scan on CPUs
 
 ## Build UNIPAR:
 git clone git@github.com:ShuangQiuac/UNIPAR.git
@@ -29,7 +29,7 @@ make
 
 ./unipar -i &lt;input file&gt; -r &lt;read length&gt; -k &lt;kmer length&gt; -n &lt;number of partitions&gt; -c &lt;number of CPUs&gt; -g &lt;number of GPUs&gt; -d &lt;intermediate file directory&gt; -o &lt;unitig output directory&gt; -t &lt;cutoff threshold&gt;
   
-### Run with multi-process:
+### Run with multiple processes:
 mpirun -np 6 ./unipar [parameter options]
 
 ### A simple example:
@@ -64,10 +64,14 @@ Miminizer based partitioning files [*intermediate file*]
 
 De Bruijn subgraph files [optional]: 
 Users can choose to output constructed De Bruijn graph if they only needed the raw graph instead of the unitigs
+
 The number of subgraph files is a user defined parameter, and set to 512 by default
+
 Output of subgraph files is turned off by default
 
 **Unitig files** [*this is the output results of UNIPAR*]: 
-The total number of unitig files equals to the total number of processors run with UNIPAR. Unitigs in all the files contributes to the final results.
+The total number of unitig files equals to the total number of processors run with UNIPAR. 
+
+Unitigs in all the files contributes to the final results.
 
 
