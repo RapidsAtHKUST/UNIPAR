@@ -5,7 +5,7 @@ UNIPAR is a fast assembly tool that use De Bruijn graph based algorithms to asse
 
 ## Pre-requisites:
 
-CUDA 5 or later, with GPU compute capability 3.0 or higher
+CUDA 5 or later, with GPU compute capability 3.5 or higher
 
 GCC 4.9 or later
 
@@ -32,7 +32,7 @@ make
 ./unipar -i &lt;input file&gt; -r &lt;read length&gt; -k &lt;kmer length&gt; -n &lt;number of partitions&gt; -c &lt;number of CPUs&gt; -g &lt;number of GPUs&gt; -d &lt;intermediate file directory&gt; -o &lt;unitig output directory&gt; -t &lt;cutoff threshold&gt;
   
 ### Run with multiple processes:
-mpirun -np 6 ./unipar [parameter options]
+mpirun -np &lt;number of processes&gt; [host options] ./unipar [parameter options]
 
 ### A simple example:
 
