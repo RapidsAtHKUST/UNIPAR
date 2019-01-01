@@ -9,23 +9,14 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH}) # 
 message("${CMAKE_BINARY_DIR}")
 message("${CMAKE_CXX_COMPILER}")
 
-find_package(TBB REQUIRED)
-if (TBB_FOUND)
-    message("${TBB_VERSION}, ${TBB_INCLUDE_DIRS}, ${TBB_LIBRARIES}")
-    include_directories(${TBB_INCLUDE_DIRS})
-    link_libraries(${TBB_LIBRARIES})
-endif ()
-add_library(tbbsort STATIC tbbsort.cpp)
-target_link_libraries(tbbsort PRIVATE ${TBB_LIBRARIES})
-
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
-	message("${MPI_VERSION}, ${MPI_INCLUDE_DIRS}, ${MPI_LIBRARIES}")
-	include_directories(${MPI_INCLUDE_DIRS})
+	message("${MPI_C_VERSION}, ${MPI_INCLUDE_PATH}, ${MPI_LIBRARIES}")
+	include_directories(${MPI_INCLUDE_PATH})
+else ()
+	set(MPI_LIBRARIES /home/sqiuac/usr/local/lib/libmpi.so)
+	set(MPI_INCLUDE_DIRS /home/sqiuac/usr/local/include)
 endif ()
-
-add_library(distribute SHARED distribute.c pio.c)
-target_link_libraries(distribute PRIVATE ${MPI_LIBRARIES})
 
 add_subdirectory(hash)
 
@@ -47,6 +38,18 @@ else ()
     endif ()
 endif ()
 
+add_library(distribute SHARED distribute.c pio.c)
+target_link_libraries(distribute PRIVATE ${MPI_LIBRARIES})
+
+find_package(TBB REQUIRED)
+if (TBB_FOUND)
+    message("${TBB_VERSION}, ${TBB_INCLUDE_DIRS}, ${TBB_LIBRARIES}")
+    include_directories(${TBB_INCLUDE_DIRS})
+    link_libraries(${TBB_LIBRARIES})
+endif ()
+add_library(tbbsort STATIC tbbsort.cpp)
+target_link_libraries(tbbsort PRIVATE ${TBB_LIBRARIES})
+
 set(SOURCE_FILES 
 	bitkmer.c comm.c contig.c dbgraph.c 
 	io.c malloc.c malloc.cuh msp.c preprocess.c
@@ -60,11 +63,12 @@ find_package("CUDA" REQUIRED)
     endmacro()
     cuda_add_compile_options("-gencode arch=compute_35,code=sm_35")
     cuda_add_compile_options("-std=c++11 -O3 -g -lineinfo")
-    cuda_add_compile_options("-Xcompiler ${OpenMP_CXX_FLAGS} -Xcompiler -march=core-avx2")
+    cuda_add_compile_options("-Xcompiler ${OpenMP_CXX_FLAGS}")
     
 cuda_add_library(culib SHARED all2all.cu comm.cu contig.cu dbgraph.cu msp.cu preprocess.cu share.cu)
 
 link_directories(${CMAKE_BINARY_DIR}/hash) 
+target_link_libraries(unipar /home/sqiuac/.linuxbrew/lib/librt.so.1)   
 target_link_libraries(unipar ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(unipar tbbsort)
 target_link_libraries(unipar distribute)

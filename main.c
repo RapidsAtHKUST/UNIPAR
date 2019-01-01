@@ -4,7 +4,6 @@
  *  Created on: 2015-7-21
  *      Author: qiushuang
  */
-//#include <mpi.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <limits.h>
@@ -18,11 +17,10 @@
 #include "include/io.h"
 #include "include/distribute.h"
 
-void msp_partition (char * input_file, char * file_dir, int k, int p, int read_length, int num_of_partitions, int num_of_msp_devices, int num_of_msp_cpus, int world_size, int world_rank);
-void construct_dbgraph_hetero (int k, int p, char * filename, char * msp_dir, char * hash_dir, int total_num_partitions, int num_of_hash_devices, int num_of_hash_cpus, \
-		subgraph_t * subgraph, dbtable_t * tbs, int world_size, int world_rank);
-void pre_process_dbgraph (int num_of_partitions, int k, int p, dbtable_t * tbs, master_t * mst, subgraph_t * subgraph, d_jvs_t * js, d_lvs_t * ls, int world_size, int world_rank);
-void traverse_dbgraph (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * djs, d_lvs_t * dls, master_t * mst, int k, int world_size, int world_rank);
+void msp_partition (char *, char *, int, int, int, int, int, int, int, int);
+void construct_dbgraph_hetero (int, int, char *, char *, char *, int, int, int, subgraph_t *, dbtable_t *, int, int);
+void pre_process_dbgraph (int, int, int, dbtable_t *, master_t *, subgraph_t *, d_jvs_t *, d_lvs_t *, int, int);
+void traverse_dbgraph (int, subgraph_t *, d_jvs_t *, d_lvs_t *, master_t *, int, int, int);
 
 
 int mpi_run = 1;
@@ -119,7 +117,7 @@ main (int argc, char ** argv)
 	int num_of_hash_devices = get_device_config();
 	int k;
 	int p=0;
-	float factor = 0.5;
+	float factor = 0.8;
 	if (get_opt(argc, argv, input_file, &read_length, &k, &p, &num_of_partitions, \
 			&num_of_hash_cpus, &num_of_hash_devices, msp_dir, contig_dir, &cutoff, &factor, &mpi_run) != 0)
 	{
