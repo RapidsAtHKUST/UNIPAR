@@ -18,7 +18,7 @@ endif ()
 add_library(tbbsort STATIC tbbsort.cpp)
 target_link_libraries(tbbsort PRIVATE ${TBB_LIBRARIES})
 
-#find_package(MPI REQUIRED)
+find_package(MPI REQUIRED)
 if (MPI_FOUND)
 	message("${MPI_VERSION}, ${MPI_INCLUDE_DIRS}, ${MPI_LIBRARIES}")
 	include_directories(${MPI_INCLUDE_DIRS})
