@@ -72,6 +72,8 @@ Output of subgraph files is turned off by default.
 **Unitig files** [*these are output results of UNIPAR*]: 
 The total number of unitig files equals to the total number of processors run with UNIPAR. 
 
+Format: contig_&lt;processor id&gt;_&lt;process id&gt;.fa
+
 Unitigs in all the files contributes to the final results.
 
 
