@@ -139,6 +139,7 @@ typedef struct master
 	int world_rank; // rank id of current process
 	ull * gpu_not_found[NUM_OF_DEVICES];
 	char * file_dir; // file directory to read the subgraphs
+	char * contig_dir; // directory to output unitigs
 //	int flag[NUM_OF_PROCS];
 } master_t; // master of communication of processors, managed in cpu
 
