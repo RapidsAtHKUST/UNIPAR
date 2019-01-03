@@ -400,7 +400,7 @@ void write_contigs_cpu (meta_t * dm, master_t * mst, int did, int k)
 	FILE * file;
 	char filename[FILENAME_LENGTH];
 	int world_rank = mst->world_rank;
-	sprintf (filename, "%s/contig%d_%d", mst->file_dir, did, world_rank);
+	sprintf (filename, "%s/contig%d_%d.fa", mst->contig_dir, did, world_rank);
 
 	if ((file = fopen (filename, "w")) == NULL)
 	{
