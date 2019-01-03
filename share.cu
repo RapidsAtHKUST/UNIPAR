@@ -280,7 +280,7 @@ void write_contigs_gpu (meta_t * dm, master_t * mst, int did, voff_t max_num, si
 	FILE * file;
 	char filename[FILENAME_LENGTH];
 	int world_rank = mst->world_rank;
-	sprintf (filename, "%s/contig%d_%d", mst->file_dir, did, world_rank);
+	sprintf (filename, "%s/contig%d_%d.fa", mst->contig_dir, did, world_rank);
 
 	if ((file = fopen (filename, "w")) == NULL)
 	{
