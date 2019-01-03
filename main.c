@@ -32,13 +32,13 @@ float inmemory_time = 0;
 extern ull kmer_count[4];
 long cpu_threads;
 
-void preprocessing (char * contig_dir, subgraph_t * subgraph, dbtable_t * tbs, int total_num_partitions, int k, int p, int num_of_devices, int num_of_cpus, int world_size, int world_rank)
+void preprocessing (char * hash_dir, char * contig_dir, subgraph_t * subgraph, dbtable_t * tbs, int total_num_partitions, int k, int p, int num_of_devices, int num_of_cpus, int world_size, int world_rank)
 {
 		evaltime_t start, end;
 
 		master_t mst;
-		mst.file_dir = contig_dir;
-		char * hash_dir = contig_dir;
+		mst.file_dir = hash_dir;
+		mst.contig_dir = contig_dir;
 		mst.num_of_cpus = num_of_cpus;
 		mst.num_of_devices = num_of_devices;
 		mst.total_num_partitions = total_num_partitions;
@@ -257,7 +257,7 @@ main (int argc, char ** argv)
 	printf ("!!!!!!!!!! total number of kmers processed on devices: %lu\n", total_dkmers);
 
 	printf ("\nWORLD RANK %d: Preprocessing graph: \n", world_rank);
-	preprocessing (contig_dir, &subgraph, tbs, num_of_partitions, k, p, num_of_hash_devices, num_of_hash_cpus, world_size, world_rank);
+	preprocessing (hash_dir, contig_dir, &subgraph, tbs, num_of_partitions, k, p, num_of_hash_devices, num_of_hash_cpus, world_size, world_rank);
 	gettimeofday(&overe, NULL);
 	print_exec_time(overs, overe, "Overall running time with UNIPAR: \n");
 
