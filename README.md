@@ -45,9 +45,9 @@ mpirun -np 2 ./unipar -i &lt;PATH_TO_UNIPAR&gt;/example/test.fa -r 36 -k 27
 
 **-r** [*INT*]: read length, the first r number of base pairs in a read will be taken
 
-**-k** [*INT*]: kmer length, no longer than the  read length
+**-k** [*INT*]: kmer length, less than or equal to the read length, suggestted to be an odd number
 
-**-n** [*INT*]: [Optional] number of partitions, set to be 512 by default
+**-n** [*INT*]: [Optional] number of partitions, set to be 512 by default, suggestted to be a number of power of 2
 
 **-c** [*INT*]: [Optional] number of CPUs to run, either 0 or 1, set to be 1 by default
 
