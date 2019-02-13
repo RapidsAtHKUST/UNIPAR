@@ -1,0 +1,57 @@
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_STANDARD 11)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -lpthread -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -lpthread -O3")
+
+find_package(TBB REQUIRED)
+if (TBB_FOUND)
+    message("${TBB_VERSION}, ${TBB_INCLUDE_DIRS}, ${TBB_LIBRARIES}")
+    include_directories(${TBB_INCLUDE_DIRS})
+    link_libraries(${TBB_LIBRARIES})
+endif ()
+add_library(tbbsort STATIC ../src/tbbsort.cpp)
+target_link_libraries(tbbsort PRIVATE ${TBB_LIBRARIES})
+
+find_package(MPI REQUIRED)
+if (MPI_FOUND)
+	message("${MPI_VERSION}, ${MPI_INCLUDE_DIRS}, ${MPI_LIBRARIES}")
+	include_directories(${MPI_INCLUDE_DIRS})
+else ()
+	set(MPI_LIBRARIES /home/sqiuac/usr/local/lib/libmpi.so)
+	set(MPI_INCLUDE_DIRS /home/sqiuac/usr/local/include)
+endif ()
+
+add_library(distribute SHARED ../src/distribute.c ../src/pio.c)
+target_link_libraries(distribute PRIVATE ${MPI_LIBRARIES})
+
+find_package(OpenMP REQUIRED)
+if (OPENMP_FOUND)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+else ()
+    # icpc
+    if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
+        message(icpc)
+        set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -qopenmp")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qopenmp")
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        message(g++)
+        set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+    endif ()
+endif ()
+
+add_library(sublib SHARED ../src/bitkmer.c ../src/io.c ../src/malloc.c ../src/share.c)
+
+find_package("CUDA" REQUIRED)	
+    macro(cuda_add_compile_options options)
+        list(APPEND CUDA_NVCC_FLAGS "${options}")
+    endmacro()
+    cuda_add_compile_options("-gencode arch=compute_35,code=sm_35 -Xptxas -dlcm=cg")
+    cuda_add_compile_options("-std=c++11 -g -O3 -lpthread")
+    cuda_add_compile_options("-Xcompiler ${OpenMP_CXX_FLAGS}")
+
+cuda_add_library(subculib SHARED 
+	../src/all2all.cu ../src/share.cu)
