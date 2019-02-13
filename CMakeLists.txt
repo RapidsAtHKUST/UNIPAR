@@ -7,9 +7,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -lpthread")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -lpthread")
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH}) # To allow CMake to locate our Find*.cmake files
-message("CMAKE BINARY DIR: ${CMAKE_BINARY_DIR}")
-message("CMAKE CXX COMPILER: ${CMAKE_CXX_COMPILER}")
-message("CMAKE CXX FLAGS: ${CMAKE_CXX_FLAGS}")
 
 add_subdirectory(sub)
 add_subdirectory(hash)
@@ -53,7 +50,6 @@ cuda_add_library(culib SHARED
 
 link_directories(${CMAKE_BINARY_DIR}/hash)
 link_directories(${CMAKE_BINARY_DIR}/sub)
-target_link_libraries(unipar /home/sqiuac/.linuxbrew/lib/librt.so.1)   
 target_link_libraries(unipar ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(unipar tbbsort)
 target_link_libraries(unipar distribute)
