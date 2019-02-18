@@ -12,6 +12,7 @@
 #include "../include/comm.h"
 #include "../include/contig.h"
 #include "../include/distribute.h"
+#include "../include/hash.h"
 #include "malloc.cuh"
 #include "contig.cuh"
 #include "../include/scan.cu"
@@ -29,6 +30,10 @@ extern float memcpyhd_time[NUM_OF_PROCS];
 extern float all2all_time_async;
 extern float inmemory_time;
 
+extern int lock_flag[NUM_OF_PROCS];
+
+//#define SYNC_ALL2ALL_
+
 extern "C"
 {
 void * compact_push_update_intra_push_gpu (void * arg)
@@ -41,14 +46,8 @@ void * compact_push_update_intra_push_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD RANK %d: Compact push update intra push gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	int world_rank = mst->world_rank;
-	int did = mst->did;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	gettimeofday (&overs, NULL);
 
 	int total_num_partitions = mst->total_num_partitions;
@@ -74,7 +73,7 @@ void * compact_push_update_intra_push_gpu (void * arg)
 		if(i>0) spid_offset += (jnb_index_offset[i] - jnb_index_offset[i-1])/2 + (jnb_index_offset[i] - jnb_index_offset[i-1])%2;
 		int num_of_blocks = (size + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_mssg_offset_compact <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (size, total_num_partitions, pid, jindex_offset[i], jnb_index_offset[i], spid_offset);
+		push_mssg_offset_compact <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (size, total_num_partitions, pid, jindex_offset[i], jnb_index_offset[i], spid_offset);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -99,7 +98,7 @@ void * compact_push_update_intra_push_gpu (void * arg)
 		if(i>0) spid_offset += (jnb_index_offset[i] - jnb_index_offset[i-1])/2 + (jnb_index_offset[i] - jnb_index_offset[i-1])%2;
 		int num_of_blocks = (size + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_mssg_compact <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (size, total_num_partitions, pid, jindex_offset[i], jnb_index_offset[i], spid_offset);
+		push_mssg_compact <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (size, total_num_partitions, pid, jindex_offset[i], jnb_index_offset[i], spid_offset);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -119,14 +118,22 @@ void * compact_push_update_intra_push_gpu (void * arg)
 	voff_t inter_start = mst->roff[did][num_of_partitions];
 	voff_t inter_end = mst->roff[did][total_num_partitions];
 
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value(&lock_flag[did], 1, 0) == false)
+		printf ("!!!!!!!!!!! CAREFUL: ATOMIC SET VALUE ERROR IN GPU %d\n", did);
+#endif
+
 #ifdef MEASURE_MEMCPY_
 	gettimeofday(&start, NULL);
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (query_t *)cm->send + inter_start, sizeof(query_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost));
 	gettimeofday(&end, NULL);
 	memcpydh_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 #else
-//	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (query_t *)cm->send + inter_start, sizeof(query_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost, streams[did]));
+#ifndef SYNC_ALL2ALL_
+	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (query_t *)cm->send + inter_start, sizeof(query_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost, streams[did][1]));
+#else
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (query_t *)cm->send + inter_start, sizeof(query_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost));
+#endif
 #endif
 	CUDA_CHECK_RETURN (cudaMemset (cm->extra_send_offsets, 0, sizeof(voff_t) * (total_num_partitions+1)));
 
@@ -140,7 +147,7 @@ void * compact_push_update_intra_push_gpu (void * arg)
 		voff_t num_mssgs = mst->roff[did][i+1] - mst->roff[did][i];
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_update_offset <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, 0, 1);
+		push_update_offset <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, 0, 1);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -210,7 +217,7 @@ void * compact_pull_update_inter_push_intra_pull_gpu (void * arg)
 		voff_t num_mssgs = mst->soff[did][i+1] - mst->soff[did][i];
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_update_offset <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, receive_start, 0);
+		push_update_offset <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, receive_start, 0);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -251,7 +258,7 @@ void * compact_pull_update_inter_push_intra_pull_gpu (void * arg)
 		voff_t num_mssgs = mst->roff[did][i+1] - mst->roff[did][i];
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_update <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, 0, 1);
+		push_update <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, 0, 1);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -270,7 +277,7 @@ void * compact_pull_update_inter_push_intra_pull_gpu (void * arg)
 		voff_t num_mssgs = mst->soff[did][i+1] - mst->soff[did][i];
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_update <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, receive_start, 0);
+		push_update <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (num_mssgs, pid, lindex_offset[i], total_num_partitions, receive_start, 0);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -288,14 +295,23 @@ void * compact_pull_update_inter_push_intra_pull_gpu (void * arg)
 #endif
 	voff_t inter_start = mst->roff[did][num_of_partitions];
 	voff_t inter_end = mst->roff[did][total_num_partitions];
+
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value(&lock_flag[did], 1, 0) == false)
+		printf ("!!!!!!!!!!! CAREFUL: ATOMIC SET VALUE ERROR IN GPU %d\n", did);
+#endif
+
 #ifdef MEASURE_TIME_
 	gettimeofday(&start, NULL);
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (compact_t *)cm->receive+inter_start, (inter_end-inter_start)*sizeof(compact_t), cudaMemcpyDeviceToHost));
 	gettimeofday(&end, NULL);
 	memcpydh_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 #else
-//	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (compact_t *)cm->receive+inter_start, (inter_end-inter_start)*sizeof(compact_t), cudaMemcpyDeviceToHost, streams[did]));
+#ifndef SYNC_ALL2ALL_
+	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (compact_t *)cm->receive+inter_start, (inter_end-inter_start)*sizeof(compact_t), cudaMemcpyDeviceToHost, streams[did][1]));
+#else
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (compact_t *)cm->receive+inter_start, (inter_end-inter_start)*sizeof(compact_t), cudaMemcpyDeviceToHost));
+#endif
 #endif
 
 #ifdef MEASURE_TIME_
@@ -310,7 +326,7 @@ void * compact_pull_update_inter_push_intra_pull_gpu (void * arg)
 		if (i>0) spid_offset += (jnb_index_offset[i] - jnb_index_offset[i-1])/2 + (jnb_index_offset[i] - jnb_index_offset[i-1])%2;
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		pull_update <<<block_size, THREADS_PER_BLOCK_NODES>>> (num_mssgs, pid, jindex_offset[i], jnb_index_offset[i], spid_offset, cm->receive, 1);
+		pull_update <<<block_size, THREADS_PER_BLOCK_NODES, 0, streams[did][0]>>> (num_mssgs, pid, jindex_offset[i], jnb_index_offset[i], spid_offset, cm->receive, 1);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -343,11 +359,7 @@ void * update_inter_pull_gpu (void * arg)
 	if (world_rank == 0)
 		printf ("WORLD RANK %d: Junction update inter pull gpu %d:\n", world_rank, did);
 
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
 
 	gettimeofday (&overs, NULL);
 	voff_t receive_start = mst->roff[did][num_of_partitions];
@@ -460,7 +472,7 @@ void * gather_contig_push_intra_pull_gpu (void * arg)
 		voff_t size = mst->id_offsets[pid+1] - mst->id_offsets[pid] - mst->jid_offset[pid];
 		int num_of_blocks = (size + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_mssg_offset_contig <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (size, pid, lindex_offset[i], total_num_partitions);
+		push_mssg_offset_contig <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (size, pid, lindex_offset[i], total_num_partitions);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -484,7 +496,7 @@ void * gather_contig_push_intra_pull_gpu (void * arg)
 		voff_t size = mst->id_offsets[pid+1] - mst->id_offsets[pid] - mst->jid_offset[pid];
 		int num_of_blocks = (size + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_mssg_contig <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (size, pid, lindex_offset[i], total_num_partitions);
+		push_mssg_contig <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1), streams[did][0]>>> (size, pid, lindex_offset[i], total_num_partitions);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -508,19 +520,17 @@ void * gather_contig_push_intra_pull_gpu (void * arg)
 	gettimeofday(&end, NULL);
 	memcpydh_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 #else
-//	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (unitig_t *)cm->send + inter_start, sizeof(unitig_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost, streams[did]));
+#ifndef SYNC_ALL2ALL_
+	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (unitig_t *)cm->send + inter_start, sizeof(unitig_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost, streams[did][1]));
+#else
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (unitig_t *)cm->send + inter_start, sizeof(unitig_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost));
+#endif
 #endif
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
 	gettimeofday (&start, NULL);
 #endif
 
-/*	printf ("WORLD RANK %d::::::: RRRRRRRRRRRECHECK INDEX_OFFSETS::::::::", did);
-	print_offsets (index_offset, num_of_partitions+1);
-
-	printf ("WORLD RANK %d::::: TTTTTTTTTTTTTSET RECEIVE OFFSETS::::::::::::::", mst->world_rank);
-	print_offsets (mst->roff[did], total_num_partitions+1);*/
 	voff_t spid_offset = 0;
 	for (i=0; i<num_of_partitions; i++)
 	{
@@ -529,7 +539,7 @@ void * gather_contig_push_intra_pull_gpu (void * arg)
 		if(i>0) spid_offset += (jnb_index_offset[i] - jnb_index_offset[i-1])/2 + (jnb_index_offset[i] - jnb_index_offset[i-1])%2;
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		pull_mssg_contig <<<block_size, THREADS_PER_BLOCK_NODES>>> (num_mssgs, pid, jindex_offset[i], jnb_index_offset[i], spid_offset, 0, 1, k);
+		pull_mssg_contig <<<block_size, THREADS_PER_BLOCK_NODES, 0, streams[did][0]>>> (num_mssgs, pid, jindex_offset[i], jnb_index_offset[i], spid_offset, 0, 1, k);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -559,15 +569,9 @@ void * gather_contig_inter_pull_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD RANK %d: gather contig inter pull gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	int world_rank = mst->world_rank;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
-	gettimeofday (&overs, NULL);
 
+	gettimeofday (&overs, NULL);
 	voff_t receive_start = mst->roff[did][num_of_partitions];
 #ifdef MEASURE_MEMCPY_
 	evaltime_t start, end;
@@ -756,6 +760,8 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 	comm_arg cm_arg;
 	cm_arg.mst=mst;
 #endif
+	create_streams(num_of_devices, 2);
+	init_lock_flag();
 
 	mst->mssg_size = sizeof(query_t);
 	for (i = 0; i < num_of_devices + num_of_cpus; i++)
@@ -791,6 +797,12 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 			printf ("create thread for compact push update intra push on cpu %d error!\n", i);
 		}
 	}
+#ifndef SYNC_ALL2ALL_
+		if (pthread_create (&comm_thread, NULL, master_all2all_async, &cm_arg) != 0)
+		{
+			printf ("Create thread for communication error!\n");
+		}
+#endif
 	for (i = 0; i < num_of_devices; i++)
 	{
 		if (pthread_join (gpu_threads[i], NULL) != 0)
@@ -805,15 +817,22 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 			printf ("Join thread on compact push update intra push on cpu %d failure!\n", i);
 		}
 	}
-	mst->mssg_size = sizeof(query_t);
+#ifndef SYNC_ALL2ALL_
+		if (pthread_join (comm_thread, NULL) != 0)
+		{
+			printf ("Join communication thread failure!\n");
+		}
+#else
 	gettimeofday (&start, NULL);
 	master_all2all(mst);
 	gettimeofday (&end, NULL);
 	all2all_time += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
+#endif
 	if (mst->world_rank == 0)
 		print_exec_time (start, end, "WORLD RANK %d: TICKTOCK TICKTOCK TICKTOCK:: master all to all time after listrank push: ", mst->world_rank);
 
 //	while(debug) {}
+	mst->mssg_size = sizeof(compact_t); // reset mssg size
 	for (i = 0; i < num_of_devices; i++)
 	{
 		if (pthread_create (&gpu_threads[i], NULL, compact_pull_update_inter_push_intra_pull_gpu, &arg[i]) != 0)
@@ -828,6 +847,12 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 			printf ("create thread for compact pull update inter push intra pull on cpu %d error!\n", i);
 		}
 	}
+#ifndef SYNC_ALL2ALL_
+		if (pthread_create (&comm_thread, NULL, master_all2all_async, &cm_arg) != 0)
+		{
+			printf ("Create thread for communication error!\n");
+		}
+#endif
 	for (i = 0; i < num_of_devices; i++)
 	{
 		if (pthread_join (gpu_threads[i], NULL) != 0)
@@ -842,12 +867,17 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 			printf ("Join thread on compact pull update inter push intra pull on cpu %d failure!\n", i);
 		}
 	}
-
-	mst->mssg_size = sizeof(compact_t);
+#ifndef SYNC_ALL2ALL_
+		if (pthread_join (comm_thread, NULL) != 0)
+		{
+			printf ("Join communication thread failure!\n");
+		}
+#else
 	gettimeofday (&start, NULL);
 	master_all2all(mst);
 	gettimeofday (&end, NULL);
 	all2all_time += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
+#endif
 	if (mst->world_rank == 0)
 		print_exec_time (start, end, "WORLD RANK %d: TICKTOCK TICKTOCK TICKTOCK:: master all to all time after compact_pull_update_inter_push_intra_pull: ", mst->world_rank);
 
@@ -1014,6 +1044,12 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 			printf ("Create thread for gather contig push intra pull on cpu error!\n");
 		}
 	}
+#ifndef SYNC_ALL2ALL_
+		if (pthread_create (&comm_thread, NULL, master_all2all_async, &cm_arg) != 0)
+		{
+			printf ("Create thread for communication error!\n");
+		}
+#endif
 	for (i=0; i<num_of_devices; i++)
 	{
 		if (pthread_join (gpu_threads[i], NULL) != 0)
@@ -1028,11 +1064,17 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 			printf ("Join thread on gather contig push intra pull on cpu error!\n");
 		}
 	}
-
+#ifndef SYNC_ALL2ALL_
+		if (pthread_join (comm_thread, NULL) != 0)
+		{
+			printf ("Join communication thread failure!\n");
+		}
+#else
 	gettimeofday (&start, NULL);
 	master_all2all(mst);
 	gettimeofday (&end, NULL);
 	all2all_time += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
+#endif
 	if (mst->world_rank == 0)
 		print_exec_time (start, end, "WORLD RANK %d: TICKTOCK TICKTOCK TICKTOCK:: master all to all time after gather_contig_push_intra_pull push: ", mst->world_rank);
 
@@ -1094,5 +1136,7 @@ compact_dbgraph_contig (int num_of_partitions, subgraph_t * subgraph, d_jvs_t * 
 	{
 		free_unitig_buffer_gpu (dm, mst);
 	}
+
+	destroy_streams(num_of_devices, 2);
 }
 }

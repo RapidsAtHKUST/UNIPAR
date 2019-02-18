@@ -536,7 +536,9 @@ __global__ static void push_mssg_offset_contig (uint size, int pid, voff_t index
 		int jpid;
 		if (!is_junction(local_fjid[index], jid_offset[fpid], id_offsets[fpid]) && !is_junction(local_bjid[index], jid_offset[bpid],id_offsets[bpid]))
 		{
+#ifdef CHECK_CONTIG
 			printf ("GPU: NONE JUNCTION END POINT FOUND:: pid=%d, index=%u, fid=%u, bid=%u!\n", pid, index, local_fjid[index], local_bjid[index]);
+#endif
 			continue;
 		}
 		else if (is_junction(local_fjid[index], jid_offset[fpid], id_offsets[fpid]) && is_junction(local_bjid[index], jid_offset[bpid], id_offsets[bpid]))

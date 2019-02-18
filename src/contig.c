@@ -69,6 +69,8 @@ extern float pull_intra_time[NUM_OF_PROCS];
 extern float pull_inter_time[NUM_OF_PROCS];
 extern float over_time[NUM_OF_PROCS];
 
+extern int lock_flag[NUM_OF_PROCS];
+
 static void set_globals_cpu (meta_t * dm, int num_of_partitions)
 {
 	posts = dm->edge.post;
@@ -627,7 +629,9 @@ static void push_mssg_offset_contig_cpu (uint size, int pid, voff_t index_offset
 			int jpid;
 			if (local_fjid[index] >= jid_offset[fpid] && local_bjid[index] >= jid_offset[bpid])
 			{
+#ifdef CHECK_CONTIG
 				printf ("CPU: NONE JUNCTION END POINT FOUND:: pid=%d, index=%u, fid=%u, bid=%u!\n", pid, index, local_fjid[index], local_bjid[index]); // a cycle here, maybe
+#endif
 				continue;
 			}
 			else if (is_junction(local_fjid[index], jid_offset[fpid], id_offsets[fpid]) && is_junction(local_bjid[index], jid_offset[bpid], id_offsets[bpid]))
@@ -1001,6 +1005,11 @@ void * compact_push_update_intra_push_cpu (void * arg)
 	voff_t inter_end = mst->roff[did][total_num_partitions];
 	mst->receive[did] = (query_t *)cm->send+inter_start;
 
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
+		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
+#endif
+
 	memset (cm->extra_send_offsets, 0, sizeof(voff_t) * (total_num_partitions+1));
 	memset (send_offsets_th, 0, sizeof(voff_t) * (total_num_partitions+1) * (cpu_threads+1));
 
@@ -1127,6 +1136,11 @@ void * compact_pull_update_inter_push_intra_pull_cpu (void * arg)
 	voff_t inter_end = cm->extra_send_offsets[total_num_partitions];
 
 	mst->receive[did] = (compact_t*)(cm->receive) + inter_start;
+
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
+		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
+#endif
 
 #ifdef MEASURE_TIME_
 	gettimeofday (&start, NULL);
@@ -1284,6 +1298,11 @@ void * gather_contig_push_intra_pull_cpu (void * arg)
 	voff_t inter_start = mst->roff[did][num_of_partitions];
 	voff_t inter_end = mst->roff[did][total_num_partitions];
 	mst->receive[did] = (unitig_t *)cm->send+inter_start;
+
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
+		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
+#endif
 
 #ifdef MEASURE_TIME_
 	gettimeofday (&start, NULL);

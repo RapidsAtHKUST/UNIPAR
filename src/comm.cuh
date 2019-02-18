@@ -45,7 +45,7 @@ __constant__ static void * receive;
 
 __constant__ static kmer_t * lkmers; // kmer values of linear vertices
 
-extern __shared__ voff_t sidoff[]; //shared memory to store id_offsets for fast query partition id; in size of (number of partitions + 1)
+extern __shared__ voff_t sidoff[]; // shared memory to load id_offsets for fast query of partition id; in size of (number of partitions + 1)
 __constant__ ull * gpu_not_found;
 
 extern "C"
@@ -53,18 +53,10 @@ extern "C"
 static void set_globals_graph_compute_gpu (meta_t * dm, master_t * mst)
 {
 	int num_of_devices = mst->num_of_devices;
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int world_size = mst->world_size;
-#endif
 	int i;
 	for (i = 0; i < num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		cudaSetDevice(world_rank * num_of_devices + i);
-#else
 		cudaSetDevice(i + DEVICE_SHIFT);
-#endif
 		CUDA_CHECK_RETURN (cudaMemcpyToSymbol (posts, &(dm[i].edge.post), sizeof(vid_t *)));
 		CUDA_CHECK_RETURN (cudaMemcpyToSymbol (pres, &dm[i].edge.pre, sizeof(vid_t *)));
 		CUDA_CHECK_RETURN (cudaMemcpyToSymbol (fwd, &dm[i].edge.fwd, sizeof(voff_t *)));
@@ -86,23 +78,13 @@ static void set_globals_graph_compute_gpu (meta_t * dm, master_t * mst)
 
 static void set_extra_send_offsets_gpu (voff_t ** extra_send_offsets_ptr, master_t * mst, int i)
 {
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	int world_rank = mst->world_rank;
-	CUDA_CHECK_RETURN (cudaSetDevice (world_rank * num_of_devices + i));
-#else
 	CUDA_CHECK_RETURN (cudaSetDevice (i + DEVICE_SHIFT));
-#endif
 	CUDA_CHECK_RETURN (cudaMemcpyToSymbol(extra_send_offsets, extra_send_offsets_ptr, sizeof(voff_t *)));
 }
 
 static void set_receive_buffer_gpu (void ** recv, int did, int world_rank, int num_of_devices)
 {
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN (cudaSetDevice(world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN (cudaSetDevice(did + DEVICE_SHIFT));
-#endif
 	CUDA_CHECK_RETURN (cudaMemcpyToSymbol(receive, recv, sizeof(void*)));
 }
 
@@ -343,22 +325,11 @@ __global__ static void push_mssg_lr (uint size, int num_of_partitions, int curr_
 	uint * local_spid_js = spid_js + index_offset;
 
 	const int gid = blockIdx.x * blockDim.x + threadIdx.x;
-//	const int tid = threadIdx.x;
 	int r, w;
-/*	w = (num_of_partitions + THREADS_PER_BLOCK_NODES) / THREADS_PER_BLOCK_NODES;
-	for (r=0; r<w; r++)
-	{
-		if (tid + r * THREADS_PER_BLOCK_NODES > num_of_partitions)
-			break;
-		sidoff[tid + r*THREADS_PER_BLOCK_NODES] = id_offsets[tid + r*THREADS_PER_BLOCK_NODES];
-	}
-	__syncthreads();*/
-
 	w = (size + TOTAL_THREADS_NODES - 1) / TOTAL_THREADS_NODES;
-	int index;
 	for (r=0; r<w; r++)
 	{
-		index = gid + r * TOTAL_THREADS_NODES;
+		int index = gid + r * TOTAL_THREADS_NODES;
 		if (index >= size)
 			break;
 		int pindex;

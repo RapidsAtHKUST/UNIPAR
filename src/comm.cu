@@ -7,7 +7,6 @@
 
 #define USE_COMM_
 
-//#define SINGLE_NODE
 //#include <cub/cub.cuh>
 #include <pthread.h>
 #include <math.h>
@@ -19,6 +18,7 @@
 #include "malloc.cuh"
 #include "comm.cuh"
 #include "../include/distribute.h"
+#include "../include/hash.h"
 #include "../include/scan.cu"
 
 //#include "sort.cu"
@@ -44,11 +44,11 @@ extern float all2all_time_async;
 extern float over_time[NUM_OF_PROCS];
 extern float comm_time;
 extern float inmemory_time;
+extern int lock_flag[NUM_OF_PROCS];
 
 extern int debug;
 extern uint dst_not_found;
 extern uint selfloop_made;
-extern int lock_flag[NUM_OF_PROCS];
 
 static uint maxx = 0;
 
@@ -63,13 +63,8 @@ void * listrank_push_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD RANK %d: listrank push gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	int world_rank = mst->world_rank;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	int total_num_partitions = mst->total_num_partitions;
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
 	voff_t * index_offset = mst->index_offset[did];
@@ -139,13 +134,8 @@ void * listrank_pull_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD_RANK %d: listrank pull gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int num_of_devices = mst->num_of_devices;
-	CUDA_CHECK_RETURN(cudaSetDevice (num_of_devices * world_rank + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice(did + DEVICE_SHIFT));
-#endif
+
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
 	voff_t * index_offset = mst->index_offset[did];
 
@@ -211,13 +201,8 @@ void * listrank_push_intra_pull_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD_RANK %d: listrank push gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int num_of_devices = mst->num_of_devices;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	gettimeofday (&overs, NULL);
 	int total_num_partitions = mst->total_num_partitions;
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
@@ -238,7 +223,7 @@ void * listrank_push_intra_pull_gpu (void * arg)
 		voff_t size = mst->id_offsets[pid+1] - mst->id_offsets[pid] - mst->jid_offset[pid];
 		int num_of_blocks = (size + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_mssg_offset_lr_async <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (size, total_num_partitions, pid, index_offset[i]);
+		push_mssg_offset_lr_async <<<block_size, THREADS_PER_BLOCK_NODES, 0, streams[did][0]>>> (size, total_num_partitions, pid, index_offset[i]);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -256,6 +241,7 @@ void * listrank_push_intra_pull_gpu (void * arg)
 	gettimeofday (&start, NULL);
 #endif
 
+
 	for (i=0; i< num_of_partitions; i++)
 	{
 		int poffset = mst->num_partitions[did];
@@ -263,7 +249,7 @@ void * listrank_push_intra_pull_gpu (void * arg)
 		voff_t size = mst->id_offsets[pid+1] - mst->id_offsets[pid] - mst->jid_offset[pid];
 		int num_of_blocks = (size + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		push_mssg_lr_async <<<block_size, THREADS_PER_BLOCK_NODES, sizeof(vid_t)*(total_num_partitions+1)>>> (size, total_num_partitions, pid, index_offset[i]);
+		push_mssg_lr_async <<<block_size, THREADS_PER_BLOCK_NODES, 0, streams[did][0]>>> (size, total_num_partitions, pid, index_offset[i]);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -281,14 +267,18 @@ void * listrank_push_intra_pull_gpu (void * arg)
 	if (atomic_set_value(&lock_flag[did], 1, 0) == false)
 		printf ("!!!!!!!!!!! CAREFUL: ATOMIC SET VALUE ERROR IN GPU %d\n", did);
 #endif
+
 #ifdef MEASURE_MEMCPY_
 	gettimeofday(&start, NULL);
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (path_t *)cm->send + inter_start, sizeof(path_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost));
 	gettimeofday(&end, NULL);
 	memcpydh_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 #else
-//	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (path_t *)cm->send + inter_start, sizeof(path_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost, streams[did]));
+#ifndef SYNC_ALL2ALL_
+	CUDA_CHECK_RETURN (cudaMemcpyAsync(mst->receive[did], (path_t *)cm->send + inter_start, sizeof(path_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost, streams[did][1]));
+#else
 	CUDA_CHECK_RETURN (cudaMemcpy(mst->receive[did], (path_t *)cm->send + inter_start, sizeof(path_t) * (inter_end-inter_start), cudaMemcpyDeviceToHost));
+#endif
 #endif
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -303,7 +293,7 @@ void * listrank_push_intra_pull_gpu (void * arg)
 		voff_t num_mssgs = mst->roff[did][i+1] - mst->roff[did][i];
 		int num_of_blocks = (num_mssgs + THREADS_PER_BLOCK_NODES - 1) / THREADS_PER_BLOCK_NODES;
 		int block_size = num_of_blocks > MAX_NUM_BLOCKS ? MAX_NUM_BLOCKS : num_of_blocks;
-		pull_mssg_lr_async <<<block_size, THREADS_PER_BLOCK_NODES>>> (num_mssgs, pid, index_offset[i], 0, 1);
+		pull_mssg_lr_async <<<block_size, THREADS_PER_BLOCK_NODES, 0, streams[did][0]>>> (num_mssgs, pid, index_offset[i], 0, 1);
 	}
 #ifdef MEASURE_TIME_
 	CUDA_CHECK_RETURN (cudaDeviceSynchronize());
@@ -327,13 +317,8 @@ void * listrank_inter_pull_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD RANK %d: listrank pull gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	int world_rank = mst->world_rank;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	gettimeofday (&overs, NULL);
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
 	voff_t * index_offset = mst->index_offset[did];
@@ -394,12 +379,8 @@ void init_graph_data_gpu (int did, master_t * mst, meta_t * dm, d_lvs_t * lvs)
 	int np_per_node = (total_num_partitions + world_size - 1)/world_size;
 	int start_partition_id = np_per_node*world_rank;
 
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	int i;
 	voff_t offset = 0;
 	for (i=0; i<num_of_partitions; i++)
@@ -433,13 +414,8 @@ void * listrank_push_modifygraph_intra_push_gpu (void * arg)
 	if (mst->world_rank == 0)
 		printf ("WORLD RANK %d: listrank push modifygraph intra push gpu %d:\n", mst->world_rank, did);
 
-#ifdef SINGLE_NODE
-	int num_of_devices = mst->num_of_devices;
-	int world_rank = mst->world_rank;
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	gettimeofday (&overs, NULL);
 	int total_num_partitions = mst->total_num_partitions;
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
@@ -551,11 +527,8 @@ void * listrank_pull_modifygraph_push_gpu (void * arg)
 	if (world_rank == 0)
 		printf ("WORLD RANK %d, listrank pull modifygraph push gpu %d\n", world_rank, did);
 
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	int total_num_partitions = mst->total_num_partitions;
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
 	int poffset = mst->num_partitions[did];
@@ -676,11 +649,8 @@ void * listrank_pull_modifygraph_inter_push_intra_pull_gpu (void * arg)
 	if (world_rank == 0)
 		printf ("WORLD RANK %d: listrank pull modifygraph push gpu %d\n", world_rank, did);
 
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
+
 	gettimeofday (&overs, NULL);
 	int total_num_partitions = mst->total_num_partitions;
 	int num_of_partitions = mst->num_partitions[did + 1] - mst->num_partitions[did];
@@ -841,11 +811,7 @@ void * modifygraph_inter_pull_gpu (void * arg)
 	if (world_rank == 0)
 		printf ("WORLD RANK %d: modigygraph inter pull gpu %d:\n", world_rank, did);
 
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
 
 	gettimeofday (&overs, NULL);
 	voff_t receive_start = mst->roff[did][num_of_partitions];
@@ -916,11 +882,7 @@ void * modifygraph_pull_gpu (void * arg)
 	if (world_rank == 0)
 		printf ("WORLD RANK %d: modigygraph pull gpu %d:\n", world_rank, did);
 
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN(cudaSetDevice (world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN(cudaSetDevice (did + DEVICE_SHIFT));
-#endif
 
 #ifdef MEASURE_TIME_
 	evaltime_t start, end;
@@ -1079,6 +1041,10 @@ listrank_hetero_workflow (int num_of_partitions, subgraph_t * subgraph, d_jvs_t 
 	uint intra_mssgs[NUM_OF_PROCS*MAX_NUM_ITERATION];
 	uint inter_mssgs[NUM_OF_PROCS*MAX_NUM_ITERATION];
 	init_mssg_count (intra_mssgs, inter_mssgs);
+
+	create_streams(num_of_devices, 2);
+	init_lock_flag();
+
 	long long prev_num_mssgs = 0;
 
 	gettimeofday(&overs, NULL);
@@ -1133,7 +1099,7 @@ listrank_hetero_workflow (int num_of_partitions, subgraph_t * subgraph, d_jvs_t 
 		}
 
 		int curr_num_mssgs = cm_arg.num_mssgs;
-		if (curr_num_mssgs - prev_num_mssgs < THRESHOLD)
+		if (curr_num_mssgs - prev_num_mssgs < THRESHOLD && prev_num_mssgs - curr_num_mssgs < THRESHOLD)
 			break;
 		prev_num_mssgs = curr_num_mssgs;
 		get_mssg_count(mst, intra_mssgs, inter_mssgs, iters);
@@ -1186,6 +1152,7 @@ listrank_hetero_workflow (int num_of_partitions, subgraph_t * subgraph, d_jvs_t 
 		}
 
 	}
+
 //	while (debug==0) {}
 
 	gettimeofday(&overe, NULL);
@@ -1199,11 +1166,7 @@ listrank_hetero_workflow (int num_of_partitions, subgraph_t * subgraph, d_jvs_t 
 	}
 	for (i=0; i<num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		CUDA_CHECK_RETURN (cudaSetDevice(world_rank * num_of_devices + i));
-#else
 		CUDA_CHECK_RETURN (cudaSetDevice(i + DEVICE_SHIFT));
-#endif
 		CUDA_CHECK_RETURN (cudaDeviceSynchronize());
 #ifdef MEASURE_TIME_
 		if (world_rank == 0)
@@ -1240,6 +1203,7 @@ listrank_hetero_workflow (int num_of_partitions, subgraph_t * subgraph, d_jvs_t 
 	gettimeofday (&totale, NULL);
 	if (world_rank == 0)
 		print_exec_time (totals, totale, "WORLD RANK %d: TTTTTTTTOTAL TIME MEASURED:: uniPath time measured: ", world_rank);
+	destroy_streams(num_of_devices, 2);
 
 	// ********** compact dbgraph with junction updates and contig output: implemented in contig.c and contig.cu ************
 	gettimeofday (&totals, NULL);
@@ -1255,6 +1219,7 @@ listrank_hetero_workflow (int num_of_partitions, subgraph_t * subgraph, d_jvs_t 
 		print_exec_time (totals, totale, "WORLD RANK %d: TTTTTTTTOTAL TIME MEASURED:: compacting and gathering contigs including contig output time measured: ", world_rank);
 
 	free(dm);
+
 	if (world_rank == 0)
 	{
 	printf ("WWWWWWWWWWWWWWWWWorld rank %d:::::::::::::::\n", world_rank);

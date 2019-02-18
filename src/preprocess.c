@@ -1291,19 +1291,11 @@ void * neighbor_push_intra_pull_cpu (void * arg)
 	voff_t inter_end = mst->roff[did][total_num_partitions];
 
 	mst->receive[did] = (assid_t *)cm->send+inter_start;
-//	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-//	pthread_mutex_lock(&mutex);
-//	lock_flag[did] = 1;
-//	pthread_mutex_unlock(&mutex);
-//	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
-//		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
 
-	uint total_not_found = 0;
-	for (i=0; i<cpu_threads; i++)
-	{
-		total_not_found += not_found[i];
-	}
-//	printf ("~~~~~~~~~~~~~~~~~~~~~ Number of vertices not found: %u, number of mssgs: %u\n", total_not_found, cm->send_offsets[num_of_partitions]);
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
+		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
+#endif
 
 	memset (not_found, 0, sizeof(uint) * cpu_threads);
 
@@ -1322,11 +1314,6 @@ void * neighbor_push_intra_pull_cpu (void * arg)
 	pull_intra_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 	print_exec_time (start, end, "***************** PULL MSSG FOR CPU *ASSIGNING ID* INTRA PROCESSOR TIME: ");
 #endif
-	for (i=0; i<cpu_threads; i++)
-	{
-		total_not_found += not_found[i];
-	}
-//	printf ("~~~~~~~~~~~~~~~~~~~~~ Number of vertices not found: %u, number of mssgs: %u\n", total_not_found, cm->send_offsets[num_of_partitions]);
 
 	return ((void*) 0);
 }
@@ -1370,12 +1357,7 @@ void * neighbor_inter_pull_cpu (void * arg)
 	pull_inter_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 	print_exec_time (start, end, "***************** PULL MSSG FOR CPU *NEIGHBORING* INTER PROCESSORS TIME: ");
 #endif
-	uint total_not_found = 0;
-	for (i=0; i<cpu_threads; i++)
-	{
-		total_not_found += not_found[i];
-	}
-//	printf ("~~~~~~~~~~~~~~~~~~~~~ Number of vertices not found: %u\n", total_not_found);
+
 	return ((void *) 0);
 }
 
@@ -1438,19 +1420,10 @@ void * shakehands_push_respond_intra_push_cpu (void * arg)
 	voff_t inter_end = mst->roff[did][total_num_partitions];
 	mst->receive[did] = (shakehands_t *)cm->send+inter_start;
 
-//	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-//	pthread_mutex_lock(&mutex);
-//	lock_flag[did] = 1;
-//	pthread_mutex_unlock(&mutex);
-//	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
-//		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
-
-	uint total_not_found = 0;
-	for (i=0; i<cpu_threads; i++)
-	{
-		total_not_found += not_found[i];
-	}
-
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
+		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
+#endif
 	memset (cm->extra_send_offsets, 0, sizeof(voff_t) * (total_num_partitions+1));
 	memset (send_offsets_th, 0, sizeof(voff_t) * (total_num_partitions+1) * (cpu_threads+1));
 
@@ -1471,10 +1444,6 @@ void * shakehands_push_respond_intra_push_cpu (void * arg)
 	pull_intra_time[did] += (float)((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)) / 1000;
 	print_exec_time (start, end, "***************** PUSH *RESPOND* OFFSET CPU INTRA PROCESSOR TIME: ");
 #endif
-	for (i=0; i<cpu_threads; i++)
-	{
-		total_not_found += not_found[i];
-	}
 
 	return ((void*) 0);
 }
@@ -1574,6 +1543,10 @@ void * shakehands_pull_respond_inter_push_intra_pull_cpu (void * arg)
 	printf ("############### WORLD RANK %d:: number of intra mssgs pulled for inter shakehands of device %d: %lu\n", mst->world_rank, did, inter_start);
 	printf ("############### WORLD RANK %d:: number of slots malloced for receive buffer of device %d: %u\n", mst->world_rank, did, cm->temp_size/sizeof(shakehands_t));
 	mst->receive[did] = (shakehands_t*)(cm->receive) + inter_start;
+#ifndef SYNC_ALL2ALL_
+	if (atomic_set_value (&lock_flag[did], 1, 0) == false)
+		printf("!!!!!!!!!!!!!!!!!! CAREFUL, SETTING VALUE DOES NOT WORK FINE!\n");
+#endif
 
 #ifdef MEASURE_TIME_
 	gettimeofday (&start, NULL);
@@ -1642,12 +1615,6 @@ void * respond_inter_pull_cpu (void * arg)
 	// *************** free (send and) receive buffer for pull and push mode
 	free_pull_push_receive_cpu(cm);
 
-	uint total_not_found = 0;
-	for (i=0; i<cpu_threads; i++)
-	{
-		total_not_found += not_found[i];
-	}
-//	printf ("~~~~~~~~~~~~~~~~~~~~~ Number of vertices not found: %u\n", total_not_found);
 	return ((void *) 0);
 }
 

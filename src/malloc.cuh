@@ -10,10 +10,10 @@
 
 #include "../include/malloc.h"
 
-static cudaStream_t streams[NUM_OF_DEVICES];
 extern voff_t * tmp_counts[NUM_OF_PROCS];
 extern double mssg_factor;
 extern double junction_factor;
+static cudaStream_t * streams[NUM_OF_DEVICES];
 
 //#define BINARY_GPU_
 
@@ -21,6 +21,36 @@ extern double junction_factor;
 
 extern "C"
 {
+static void create_streams (int num_of_devices, int num_concurrent_streams)
+{
+	int i;
+	for (i=0; i<num_of_devices; i++)
+	{
+		streams[i] = (cudaStream_t*) malloc (sizeof(cudaStream_t) * num_concurrent_streams);
+		CHECK_PTR_RETURN(streams, "malloc cudaStreams error for device %d!\n", i);
+		int j;
+		for (j=0; j<num_concurrent_streams; j++)
+		{
+			cudaSetDevice(i + DEVICE_SHIFT);
+			CUDA_CHECK_RETURN (cudaStreamCreate(&streams[i][j]));
+		}
+	}
+}
+
+static void destroy_streams (int num_of_devices, int num_concurrent_streams)
+{
+	int i;
+	for (i=0; i<num_of_devices; i++)
+	{
+		int j;
+		for (j=0; j<num_concurrent_streams; j++)
+		{
+			CUDA_CHECK_RETURN (cudaStreamDestroy(streams[i][j]));
+		}
+		free(streams[i]);
+	}
+}
+
 static void init_device_filter1 (dbmeta_t * dbm, master_t * mst, vid_t max_subsize)
 {
 	int num_of_devices = mst->num_of_devices;
@@ -160,7 +190,6 @@ static void init_device_preprocessing (dbmeta_t * dbm, master_t * mst)
 	#else
 			cudaSetDevice(i + DEVICE_SHIFT);
 	#endif
-			CUDA_CHECK_RETURN (cudaStreamCreate(&streams[i]));
 	//		int num_of_partitions = mst->num_partitions[i + 1] - mst->num_partitions[i];
 			vid_t gsize = mst->num_vs[i] * BINARY_FACTOR;
 			int num_partitions_device = mst->num_partitions[i+1] - mst->num_partitions[i];
@@ -232,8 +261,6 @@ static void finalize_device_preprocessing (dbmeta * dbm, master_t * mst)
 #else
 		cudaSetDevice(i + DEVICE_SHIFT);
 #endif
-		CUDA_CHECK_RETURN (cudaStreamDestroy(streams[i]));
-
 		cudaFree (dbm[i].comm.id2index);
 		cudaFree (dbm[i].comm.receive_offsets);
 		cudaFree (dbm[i].comm.send_offsets);
@@ -359,7 +386,6 @@ static void init_device_graph_compute (meta_t * dm, master_t * mst)
 #else
 		cudaSetDevice(i + DEVICE_SHIFT);
 #endif
-		CUDA_CHECK_RETURN (cudaStreamCreate(&streams[i]));
 		vid_t gsize = mst->num_vs[i];
 		if (gsize > MAX_NUM_NODES_DEVICE)
 		{
@@ -422,13 +448,7 @@ static void finalize_device_graph_compute (meta_t * dm, master_t * mst)
 	int i;
 	for (i = 0; i < num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		cudaSetDevice(world_rank * num_of_devices + i);
-#else
 		cudaSetDevice(i + DEVICE_SHIFT);
-#endif
-		CUDA_CHECK_RETURN (cudaStreamDestroy(streams[i]));
-
 		cudaFree (dm[i].edge.fwd);
 		cudaFree (dm[i].edge.bwd);
 		cudaFree (dm[i].edge.fjid);
@@ -458,16 +478,9 @@ static void finalize_device_graph_compute (meta_t * dm, master_t * mst)
 static void malloc_pull_push_offset_gpu (voff_t ** extra_send_offsets, master_t * mst, int i)
 {
 	int total_num_partitions = mst->total_num_partitions;
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int num_of_devices = mst->num_of_devices;
-	CUDA_CHECK_RETURN (cudaSetDevice (world_rank * num_of_devices + i));
-#else
 	CUDA_CHECK_RETURN (cudaSetDevice (i + DEVICE_SHIFT));
-#endif
 	CUDA_CHECK_RETURN (cudaMalloc(extra_send_offsets, sizeof(voff_t) * (total_num_partitions+1)));
 	CUDA_CHECK_RETURN (cudaMemset (*extra_send_offsets, 0, sizeof(voff_t) * (total_num_partitions+1)));
-//		CUDA_CHECK_RETURN (cudaMemcpyToSymbol(extra_send_offsets, &dm[i].comm.extra_send_offsets, sizeof(voff_t *)));
 }
 
 static void free_pull_push_offset_gpu (voff_t * extra_send_offsets)
@@ -477,11 +490,7 @@ static void free_pull_push_offset_gpu (voff_t * extra_send_offsets)
 
 static size_t malloc_pull_push_receive_device (void ** recv, uint mssg_size, int did, voff_t num_of_mssgs, int expand, int world_rank, int num_of_devices)
 {
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN (cudaSetDevice(world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN (cudaSetDevice(did + DEVICE_SHIFT));
-#endif
 	size_t malloc_size = (ull)mssg_size * num_of_mssgs * expand;
 	CUDA_CHECK_RETURN (cudaMalloc(recv, (ull)mssg_size * num_of_mssgs * expand));
 //	CUDA_CHECK_RETURN (cudaMemcpyToSymbol(receive, recv, sizeof(void*)));
@@ -490,29 +499,17 @@ static size_t malloc_pull_push_receive_device (void ** recv, uint mssg_size, int
 
 static void free_pull_push_receive_device (int did, comm_t * dm, int world_rank, int num_of_devices)
 {
-#ifdef SINGLE_NODE
-	CUDA_CHECK_RETURN (cudaSetDevice(world_rank * num_of_devices + did));
-#else
 	CUDA_CHECK_RETURN (cudaSetDevice(did + DEVICE_SHIFT));
-#endif
 	CUDA_CHECK_RETURN (cudaFree(dm->receive));
 }
 
 static void realloc_device_edges (meta_t * dm, master_t * mst)
 {
 	int num_of_devices = mst->num_of_devices;
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int world_size = mst->world_size;
-#endif
 	int i;
 	for (i = 0; i < num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		cudaSetDevice(world_rank * num_of_devices + i);
-#else
 		cudaSetDevice(i + DEVICE_SHIFT);
-#endif
 		vid_t lsize = mst->num_vs[i];
 		vid_t jsize = mst->num_js[i];
 		if (lsize > MAX_NUM_NODES_DEVICE || jsize > MAX_NUM_NODES_DEVICE)
@@ -536,18 +533,10 @@ static void realloc_device_edges (meta_t * dm, master_t * mst)
 static void realloc_device_junctions (meta_t * dm, master_t * mst)
 {
 	int num_of_devices = mst->num_of_devices;
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int world_size = mst->world_size;
-#endif
 	int i;
 	for (i = 0; i < num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		cudaSetDevice(world_rank * num_of_devices + i);
-#else
 		cudaSetDevice(i + DEVICE_SHIFT);
-#endif
 		vid_t gsize = mst->num_js[i];
 		vid_t nbsize = mst->num_jnbs[i];
 		voff_t spids_size = mst->spids_size[i];
@@ -582,18 +571,10 @@ static void realloc_device_junctions (meta_t * dm, master_t * mst)
 static void free_device_realloc (meta_t * dm, master_t * mst)
 {
 	int num_of_devices = mst->num_of_devices;
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int world_size = mst->world_size;
-#endif
 	int i;
 	for (i = 0; i < num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		cudaSetDevice(world_rank * num_of_devices + i);
-#else
 		cudaSetDevice(i + DEVICE_SHIFT);
-#endif
 		cudaFree(dm[i].edge.post);
 		cudaFree(dm[i].edge.pre);
 		cudaFree(dm[i].edge.pre_edges);
@@ -622,18 +603,10 @@ static void malloc_unitig_buffer_gpu (meta_t * dm, size_t size, int did, int num
 static void free_unitig_buffer_gpu (meta_t * dm, master_t * mst)
 {
 	int num_of_devices = mst->num_of_devices;
-#ifdef SINGLE_NODE
-	int world_rank = mst->world_rank;
-	int world_size = mst->world_size;
-#endif
 	int i;
 	for (i=0; i<num_of_devices; i++)
 	{
-#ifdef SINGLE_NODE
-		cudaSetDevice(world_rank * num_of_devices + i);
-#else
 		cudaSetDevice(i + DEVICE_SHIFT);
-#endif
 		cudaFree (dm[i].junct.unitigs);
 	}
 }

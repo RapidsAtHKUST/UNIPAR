@@ -104,14 +104,14 @@ main (int argc, char ** argv)
 	uch * ptr;
 	uint size;
 
-	char input_file[PATH_MAX];
-	memset (input_file, 0, sizeof(char) * PATH_MAX);
-	char msp_dir[PATH_MAX];
-	memset (msp_dir, 0, sizeof(char) * PATH_MAX);
-	char hash_dir[PATH_MAX];
-	memset (hash_dir, 0, sizeof(char) * PATH_MAX);
-	char contig_dir[PATH_MAX];
-	memset (contig_dir, 0, sizeof(char) * PATH_MAX);
+	char input_file[PATH_MAX_LEN];
+	memset (input_file, 0, sizeof(char) * PATH_MAX_LEN);
+	char msp_dir[PATH_MAX_LEN];
+	memset (msp_dir, 0, sizeof(char) * PATH_MAX_LEN);
+	char hash_dir[PATH_MAX_LEN];
+	memset (hash_dir, 0, sizeof(char) * PATH_MAX_LEN);
+	char contig_dir[PATH_MAX_LEN];
+	memset (contig_dir, 0, sizeof(char) * PATH_MAX_LEN);
 	int num_of_partitions = 512;
 	int num_of_hash_cpus = 1;
 	int num_of_hash_devices = get_device_config();
@@ -170,7 +170,7 @@ main (int argc, char ** argv)
 		mpi_init (&provided, &world_size, &world_rank);
 	}
 
-	char cwd[PATH_MAX];
+	char cwd[PATH_MAX_LEN];
 	if (getcwd(cwd, sizeof(cwd)) != NULL) {
 		if(world_rank == 0)
 	       printf("Current working dir: %s\n", cwd);

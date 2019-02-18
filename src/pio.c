@@ -714,7 +714,7 @@ uint compute_msp (int t, int p, int k, int num_of_partitions, char * read_buffer
 
 #pragma omp parallel
 {
-	/* debug: test number of threads */
+	//****** test number of threads *******
 	int nths = omp_get_num_threads ();
 	int thid = omp_get_thread_num ();
 	if (nths != cpu_threads)
@@ -730,7 +730,7 @@ uint compute_msp (int t, int p, int k, int num_of_partitions, char * read_buffer
 	evaltime_t start, end;
 //	printf ("id: %d, num of threads: %d\n", thid, nths);
 
-	/* Be careful: read_size may not be divided by cpu_threads! */
+	//******* Be careful: read_size may not be divided by cpu_threads! **********
 	size_t read_size_per_thread = (read_size + cpu_threads - 1) / cpu_threads;
 	if (read_size_per_thread <= cpu_threads)
 		read_size_per_thread = read_size / cpu_threads;
@@ -749,11 +749,11 @@ uint compute_msp (int t, int p, int k, int num_of_partitions, char * read_buffer
 
 	if (thid > 0)
 		skip_one_line (&read_ptr, &roffset);
-	/* if the thread reads starting at the middle of a line, then this line will be processed by its predecessor, thus it skip this line */
+	//* if the thread reads starting at the middle of a line, then this line will be processed by its predecessor, thus it skip this line *
 
 	rbufs[turn][thid] = read_ptr; // Store the start position of each read buffer area for each thread
 
-	/* initiate msp variables */
+	//******* initiate msp variables *********
 	char * read;
 	char revs[read_length];
 
@@ -791,7 +791,7 @@ uint compute_msp (int t, int p, int k, int num_of_partitions, char * read_buffer
 
 	gettimeofday (&start, NULL);
 
-	/* COMPUTING MSP INFO FOR A READ BEGINS */
+	//******* COMPUTING MSP INFO FOR A READ BEGINS *********
 	get_rev (read, revs, read_length);
 	int i = 0;
 	uch num = 0;
@@ -840,7 +840,7 @@ uint compute_msp (int t, int p, int k, int num_of_partitions, char * read_buffer
 		exit (0);
 	}
 #endif
-	/* COMPUTING MSP INFO FOR A READ ENDS */
+	//****** COMPUTING MSP INFO FOR A READ ENDS *******
 
 	gettimeofday (&end, NULL);
 	time += ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec));
@@ -872,7 +872,7 @@ parse_data (char ** read_buffer, read_buf_t * reads, ull read_size, int turn, ch
 
 #pragma omp parallel
 {
-	/* debug: test number of threads */
+	//******* test number of threads *********
 	int nths = omp_get_num_threads ();
 	int thid = omp_get_thread_num ();
 	if (nths != cpu_threads)
@@ -881,7 +881,7 @@ parse_data (char ** read_buffer, read_buf_t * reads, ull read_size, int turn, ch
 		exit(1);
 	}
 
-	/* Be careful: read_size may not be divided by cpu_threads! */
+	//******** Be careful: read_size may not be divided by cpu_threads! *********
 	size_t read_size_per_thread = (read_size + cpu_threads - 1) / cpu_threads;
 	if (read_size_per_thread <= cpu_threads)
 		read_size_per_thread = read_size / cpu_threads;
@@ -902,7 +902,7 @@ parse_data (char ** read_buffer, read_buf_t * reads, ull read_size, int turn, ch
 
 	if (thid > 0)
 		skip_one_line (&read_ptr, &roffset);
-	/* if the thread reads starting at the middle of a line, then this line will be processed by its predecessor, thus it skip this line */
+	//******* if the thread reads starting at the middle of a line, then this line will be processed by its predecessor, thus it skip this line *****
 
 	rbufs[turn][thid] = read_ptr; // Store the start position of each read buffer area for each thread
 
@@ -972,7 +972,7 @@ init_msp_meta (int num_of_partitions, double read_ratio, int read_length, int k)
 
 }
 
-/* set offset of one msp buffer meta information to 0 */
+//***** set offset of one msp buffer meta information to 0 *******
 void
 reset_msp_meta (msp_meta_t * meta)
 {
@@ -982,7 +982,7 @@ reset_msp_meta (msp_meta_t * meta)
 	memset (meta->spkbuf, 0, sizeof(seq_t) * meta->spksize);
 }
 
-/* expand one particular msp meta buffer by twice */
+//******** expand one particular msp meta buffer by twice ********
 void
 expand_msp_meta (msp_meta_t * meta)
 {
@@ -1064,7 +1064,7 @@ output_msp_cpu (uch * msp_arr, char ** rbufs[], uint * rnums[], int k, int num_o
 {
 	length_range_t range = h_range;
 
-	/* debug: test number of threads */
+	//******** test number of threads *********
 	int nths = omp_get_num_threads ();
 	int thid = omp_get_thread_num ();
 	if (nths != cpu_threads)
@@ -1139,7 +1139,7 @@ output_msp_cpu (uch * msp_arr, char ** rbufs[], uint * rnums[], int k, int num_o
 		read_size_end = read_size_per_thread - 1;
 	else
 		read_size_end = read_size_per_thread;
-	/* cut reads into superkmers; process read by read */
+	//********* cut reads into superkmers; process read by read ********
 	for (i = 0; i < read_num; i++)
 	{
 		/* Get one legal read from  read buffer */
@@ -1188,9 +1188,9 @@ output_msp_cpu (uch * msp_arr, char ** rbufs[], uint * rnums[], int k, int num_o
 
 		}
 
-		/* end of the read */
+		//* end of the read *
 		mspid = spk_ids[i * max_num_ms + j];
-		/* for debug only: */
+		//* for debug only: *
 #ifdef DEBUG
 		if (mspid >= num_of_partitions)
 		{
@@ -1230,7 +1230,7 @@ output_msp_cpu (uch * msp_arr, char ** rbufs[], uint * rnums[], int k, int num_o
 	}
 }
 
-	/* finally write out msp buffers to files */
+	//**** finally write out msp buffers to files ****
 	FILE * file;
 	int i, j, t;
 	omp_set_num_threads (MAX_IO_THREADS);
@@ -1346,7 +1346,7 @@ get_superkmers (char * filename[], spkmer_t * spkmers, int k, FILE ** mspinput)
 	lenarr = (uch *) malloc (sizeof(uch) * total_num_of_spk);
 //	indices = (uint *) malloc (sizeof(uint) * total_num_of_spk);
 
-	/* Allocate read buffer memory */
+	//**** Allocate read buffer memory ****
 	seq_t * read_buffer = (seq_t *) malloc (sizeof(seq_t) * total_mspsize);
 
 	CHECK_PTR_RETURN (ridarr, "init spk rid array malloc with file %s\n", filename[i]);
