@@ -7,13 +7,15 @@
 
 #ifndef COMM_H_
 #define COMM_H_
-#define SYNC_ALL2ALL_
+//#define SYNC_ALL2ALL_
 
 #include "utility.h"
 #include "dbgraph.h"
 #include "graph.h"
 
+#ifndef NUM_OF_PROCS
 #define NUM_OF_PROCS 5
+#endif
 #define MAX_NUM_NODES_DEVICE 188743680 // 180M (52428800*4) // 200M this macro determines the total number of vertices in each GPU
 #define MAX_NUM_NODES_DEVICE_HASH 209715200 //188743680 //157286400 //83886080 //104857600
 #define MAX_NUM_ITERATION 15
@@ -24,7 +26,7 @@
 //#define MEASURE_TIME_
 //#define MEASURE_MEMCPY_
 
-//#define CONTIG_CHECK
+//#define CHECK_CONTIG
 
 #define MAX_VID 4294967295
 #define MOST_BIT 0x80000000
@@ -39,6 +41,55 @@
 			max=arr[i]; }}			\
 }
 
+#define SPID_MASK 0xffff
+#define SPID_BITS 16
+#define get_spid_index(index) ((index)/2)
+#define get_spid_unit_offset(index) (1 - (index)%2)
+
+#define encode_pid_for_post(pid, spid) {\
+	spid &= 0xffff0000; \
+	spid |= (uint)(pid); }
+
+#define encode_pid_for_pre(pid, spid) {\
+	spid &= 0x0000ffff; \
+	spid |= (uint)(pid) << SPID_BITS; }
+
+#define get_pid_for_post(pid, spid) {\
+	pid = (uint)(spid) & SPID_MASK; }
+
+#define get_pid_for_pre(pid, spid) {\
+	pid = (uint)(spid) >> SPID_BITS; }
+
+#define get_selfid(selfid, index, jid_offset, id_offsets) {\
+	selfid = (index) + (jid_offset); }
+
+#define is_junction(selfid, jid_offset, id_offsets) ((selfid) < (jid_offset))
+
+#define is_smaller_junction(jpid, jid, ojpid, ojid) (jpid<ojpid || (jpid==ojpid && jid<ojid))
+
+#define encode_two_pids(spid, pre, post) {\
+	spid = pre << SPID_BITS | post; }
+
+#define get_jnb_pid(spids, nb_index) (spids[(nb_index)/2] >> ((1 - (nb_index)%2)*SPID_BITS) & SPID_MASK)
+
+#define update_jnb_pid(spids, nb_index, pid) {\
+	spids[(nb_index)/2] &= (0xffff << (((nb_index)%2) * SPID_BITS)); \
+	spids[(nb_index)/2] |= (pid) << ((1 - (nb_index)%2) * SPID_BITS); }
+
+#define encode_path_pids(spids, dst, opps, jid, cid) {\
+	spids = 0; \
+	spids |= (ull)(dst) << 48; \
+	spids |= (ull)(opps) << 32; \
+	spids |= (ull)(jid) << 16; \
+	spids |= (cid); }
+
+#define decode_path_pids(spids, dst, opps, jid, cid) {\
+	dst = (ull)(spids) >> 48 & SPID_MASK; \
+	opps = (ull)(spids) >> 32 & SPID_MASK; \
+	jid = (ull)(spids) >> 16 & SPID_MASK; \
+	cid = (ull)(spids) & SPID_MASK; }
+
+typedef unsigned long long goffset_t; // for global offsets type
 typedef enum ptype {even, uneven} ptype; // choose for distributing subgraphs to processors in a computer node
 
 typedef uint k_t;
@@ -49,6 +100,7 @@ typedef struct kv {
 }kv_t;
 
 typedef struct path {
+	ull spids; // compact partition ids of dst, opps, jid, cid
 	vid_t dst; // destination vertex, being current post or pre
 	vid_t opps; // opposite direction of neighbors
 	vid_t jid; // if opps == MAX_VID; this direction meets a junction
@@ -69,12 +121,14 @@ typedef struct rank {
 typedef struct query {
 	vid_t jid; // junction id with this query
 	vid_t nid; // linear neighbor id of the junction
+	uint spid; // compact partition ids of jid and nid
 } query_t; // query neighbor with nid from junction jid
 
 typedef struct compact {
 	vid_t nid; // linear neighbor of the junction
 	vid_t jid; // junction id with this query
 	vid_t ojid;
+	uint spid; // compact jid for nid (as pre) and ojid (as post);
 	int plen; // length of this unitig
 //	int rank; // rank of this vertex in the unitig
 } compact_t; // push back opposite junction id for a query from a junction
@@ -82,6 +136,7 @@ typedef struct compact {
 typedef struct unitig {
 	vid_t jid; // junction id (an endpoint)
 	vid_t ojid; // the opposite junction id (another endpoint)
+	uint spid; // compact partition ids of jid (as pre) and ojid (as post)
 	voff_t rank; // encode edge into the first two bits of rank, rank of the linear vertex in the unitig
 	voff_t len; // total length of this unitig, used to identify different paths with the same jids
 } unitig_t;
@@ -105,8 +160,8 @@ typedef struct meta
 	comm_t comm;
 	edge_t edge; // record info for linear vertices
 	csr_t junct; // record info for junctions
-	vid_t * id_offsets; // vertex id offsets for partitions, copied from master; it points to the memory on device to store id_offsets
-	vid_t * jid_offset; // junction size for partitions, copied from master; it points to the memory on device to store jid_offset
+	goffset_t * id_offsets; // vertex id offsets for partitions, copied from master; it points to the memory on device to store id_offsets
+	goffset_t * jid_offset; // junction size for partitions, copied from master; it points to the memory on device to store jid_offset
 	vid_t * dvt;
 } meta_t; // meta data to manage communication and graph computation, used in listranking and contig workflow
 
@@ -115,6 +170,7 @@ typedef struct master
 	vid_t num_vs[NUM_OF_PROCS]; // total number of linear vertices in each processor
 	vid_t num_js[NUM_OF_PROCS]; // total number of junctions in each processor
 	vid_t num_jnbs[NUM_OF_PROCS]; // total number of neighbors for junctions in each processor
+	vid_t spids_size[NUM_OF_PROCS];
 	voff_t * soff[NUM_OF_PROCS]; // send offsets
 	voff_t * roff[NUM_OF_PROCS]; // receive offsets
 	void * send[NUM_OF_PROCS]; // send buffer of master
@@ -127,8 +183,8 @@ typedef struct master
 	voff_t * jnb_index_offset[NUM_OF_PROCS]; // index_offset to store the start positions of neighbors of junctions in each partition in a processor
 	int * partition_list; // partition list, from device 0, ..., n, cpu 0, ..., m in a computer node; initialized in init_distribute_partitions
 	int * r2s; // from the receive buffer to the send buffer; for all to all communication, initialized in distribute_partitions
-	vid_t * id_offsets;
-	vid_t * jid_offset;
+	goffset_t * id_offsets;
+	goffset_t * jid_offset;
 	int * pfrom[NUM_OF_PROCS]; // for parallel memory copy
 	int num_partitions[NUM_OF_PROCS + 1]; // prefix sum of the numbers of partitions in each processor
 	int total_num_partitions; // total number of partitions in all processes
@@ -139,7 +195,7 @@ typedef struct master
 	int world_rank; // rank id of current process
 	ull * gpu_not_found[NUM_OF_DEVICES];
 	char * file_dir; // file directory to read the subgraphs
-	char * contig_dir; // directory to output unitigs
+	char * contig_dir; // contig directory for output
 //	int flag[NUM_OF_PROCS];
 } master_t; // master of communication of processors, managed in cpu
 
@@ -168,8 +224,6 @@ typedef struct dbmeta
 	vertices_t nds;
 	vertex_t * vs;
 	entry_t * ens;
-//	ull * before_sort;
-//	ull * sorted_kmers;
 	kmer_t * before_sort;
 	kmer_t * sorted_kmers;
 	vid_t * before_vids;
@@ -177,8 +231,8 @@ typedef struct dbmeta
 	vid_t * nb[EDGE_DIC_SIZE]; // neighbor arrays for junctions
 	voff_t * jvld; // valid junction flag array;
 	voff_t * lvld; // valid linear vertex flag array;
-	vid_t * id_offsets; // vertex id offsets for partitions, copied from master; it points to the memory on device to store id_offsets
-	vid_t * jid_offset; // junction size for partitions, copied from master; it points to the memory on device to store jid_offset
+	goffset_t * id_offsets; // vertex id offsets for partitions, copied from master; it points to the memory on device to store id_offsets
+	goffset_t * jid_offset; // junction size for partitions, copied from master; it points to the memory on device to store jid_offset
 	d_jvs_t djs; // structure array of junction vertices, for data transfers
 	d_lvs_t dls; // structure array of linear vertices, for data transfers
 } dbmeta_t; // meta data for data structures in each processor
@@ -186,7 +240,6 @@ typedef struct dbmeta
 typedef struct shakehands {
 	kmer_t dst; // destination kmer
 	int code; // encoded two edges and their directions
-//	msp_id_t pid;
 } shakehands_t; // two connected vertices shake hands via bidirected edges
 
 typedef struct assid {
