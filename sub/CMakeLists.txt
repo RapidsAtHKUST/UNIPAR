@@ -54,4 +54,4 @@ find_package("CUDA" REQUIRED)
     cuda_add_compile_options("-Xcompiler ${OpenMP_CXX_FLAGS}")
 
 cuda_add_library(subculib SHARED 
-	../src/all2all.cu ../src/share.cu)
+	../src/share.cu)
