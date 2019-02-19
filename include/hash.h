@@ -148,6 +148,8 @@ bool is_equal_kmer_cpu (kmer_t * t_entry, kmer_t * kmer);
 hashval_t hashtab_mod_cpu (hashval_t hash, uint size_prime_index);
 hashval_t hashtab_mod_m2_cpu (hashval_t hash, uint size_prime_index);
 ull atomic_and (ull * address, ull value);
+uint atomic_and_int (uint *, uint);
+uint atomic_or_int (uint *, uint);
 bool atomic_set_value (int*, int, int);
 
 #endif /* HASH_H_ */

@@ -16,12 +16,16 @@ typedef struct d_jvertices
 	vid_t * id;
 	vid_t * nbs[EDGE_DIC_SIZE];
 	kmer_t * kmers;
+	ull * spids; // shared partition ids for neighors, gathered from preprocess
+	ull * spidsr; // shared partition ids for neighbors of reverse complements, gathered from preprocess
 	ull * edges;
 	uint size;
 	voff_t * csr_offs; // csr offset array for all processors in a computer node, for contig gather
 	vid_t * csr_nbs; // csr neighbor array for all processors in a computer node, for contig gather
-	voff_t * csr_offs_offs; // prefix sum of sizes of csr offset arrays of subgraphs, for contig gather
-	voff_t * csr_nbs_offs; // prefix sum of sizes of csr neighbor arrays of subgraphs, for contig gather
+	uint * csr_spids; // csr shared partition ids for neighbors of junctions in a computer node, for contig gather
+	voff_t * csr_offs_offs; // prefix sum of sizes of csr offset arrays of subgraphs in a computer node, for contig gather
+	voff_t * csr_nbs_offs; // prefix sum of sizes of csr neighbor arrays of subgraphs in a computer node, for contig gather
+	voff_t * csr_spids_offs; // prefix sum of sizes of csr spids in a computer node
 } d_jvs_t; // junction vertex structure, one such meta structure one computer node
 
 typedef struct d_lvertices
@@ -29,6 +33,7 @@ typedef struct d_lvertices
 	vid_t * id; // set to null in this implementation
 	vid_t * pres;
 	vid_t * posts;
+	uint * spids; // shared partition ids of pre and post
 	kmer_t * kmers;
 	edge_type * pre_edges;
 	edge_type * post_edges;
@@ -41,15 +46,20 @@ typedef struct vertex
 	vid_t nbs[EDGE_DIC_SIZE];
 	kmer_t kmer;
 	ull edge;
-	vid_t vid; // used in assigning ids of vertices
-} vertex_t;
+//	ull spids; // shared partition ids for neighors
+//	ull spidsr; // shared partition ids for neighbors of reverse complements
+	vid_t vid; // used in assigning ids of vertices, indicating whether a vertex is a junction or linear vertex
+} vertex_t; // for preprocess on CPU
 
 typedef struct vertices
 {
 	kmer_t * kmer; // put this field in the first
 	ull * edge; //multiplicity of edges for both kmer and its reverse, be careful if the multiplicity exceeds 255!!!
+//	ull * spids; // shared partition ids for neighors
+//	ull * spidsr; // shared partition ids for neighbors of reverse complements
 	vid_t * vid;
-} vertices_t; // this vertices_t is not the same as defined in dbgraph.h of hash table construction, but a converted to pointer of arrays version
+} vertices_t; // for preprocess on GPU
+// this vertices_t is not the same as defined in dbgraph.h of hash table construction, but a converted to pointer of arrays version
 
 /*edge: bidirected */
 typedef struct edge
@@ -60,6 +70,8 @@ typedef struct edge
 	voff_t * bwd; // length of each backward path (forward path of the reverse)
 	vid_t * fjid; //junction id for forward path
 	vid_t * bjid; //junction id for backward path
+	uint * spid_nb; // shared partition id by pre and post
+	uint * spid_js; // shared partition id by fjid and bjid
 	kmer_t * kmers; //kmer values of linear vertices
 	edge_type * pre_edges; // edge character of the reverse of each linear vertex
 	edge_type * post_edges; // edge character of each linear vertex
@@ -69,6 +81,7 @@ typedef struct csr
 {
 	voff_t * offs; // offset array of neighbors of junctions
 	vid_t * nbs; // neighbor array of junctions
+	uint * spids; // shared partition ids for neighbors of junctions
 	kmer_t * kmers; // kmer values of junctions
 	ull * edges; // edges of junctions
 	size_t * ulens; // length of unitigs for each junction branch
