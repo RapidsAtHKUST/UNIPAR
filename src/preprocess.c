@@ -18,9 +18,7 @@
 #include "../include/malloc.h"
 #include "../include/share.h"
 
-#define CPU_THREADS 24 // for debugging
-#define ASSID_THREADS 24 // for debugging
-#define SHAKEHANDS_THREADS 24 // for debugging
+#define CPU_THREADS 128 // for debugging
 extern thread_function shift_dictionary[];
 #ifdef LITTLE_ENDIAN
 static const ull zerotable[8] = { 0xffffffffffffff00, 0xffffffffffff00ff, 0xffffffffff00ffff, 0xffffffff00ffffff, 0xffffff00ffffffff, 0xffff00ffffffffff, 0xff00ffffffffffff, 0xffffffffffffff};
@@ -117,12 +115,12 @@ static void set_globals_preprocessing (dbmeta_t * dbm, int num_of_partitions)
 	id2index = dbm->comm.id2index;
 	index_offsets = dbm->comm.index_offsets;
 
-	send_offsets_th = (voff_t*) malloc (sizeof(voff_t) * (num_of_partitions+1) * (CPU_THREADS+1));
+	send_offsets_th = (voff_t*) malloc (sizeof(voff_t) * (num_of_partitions+1) * (cpu_threads+1));
 	CHECK_PTR_RETURN (send_offsets_th, "malloc local send offsets for multi-threads in push mssg offset error!\n");
-	memset (send_offsets_th, 0, sizeof(voff_t) * (num_of_partitions+1) * (CPU_THREADS+1));
-	tmp_send_offsets_th = (voff_t*) malloc (sizeof(voff_t) * (num_of_partitions+1) * (CPU_THREADS+1));
+	memset (send_offsets_th, 0, sizeof(voff_t) * (num_of_partitions+1) * (cpu_threads+1));
+	tmp_send_offsets_th = (voff_t*) malloc (sizeof(voff_t) * (num_of_partitions+1) * (cpu_threads+1));
 	CHECK_PTR_RETURN (send_offsets_th, "malloc tmp send offsets for multi-threads in push mssg offset error!\n");
-	memset (tmp_send_offsets_th, 0, sizeof(voff_t) * (num_of_partitions+1) * (CPU_THREADS+1));
+	memset (tmp_send_offsets_th, 0, sizeof(voff_t) * (num_of_partitions+1) * (cpu_threads+1));
 }
 
 void init_preprocessing_data_cpu (dbmeta_t * dbm, int num_of_partitions)
