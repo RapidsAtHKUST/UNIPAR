@@ -1036,9 +1036,12 @@ finalize_msp_meta (int k, int num_of_partitions, offset_t * max_kmers, offset_t 
 	if (mpi_run > 0)
 	{
 		printf ("world rank %d: gathering numbers:::::::::::::::::::\n", world_rank);
-		MPI_Allgather (&max_spks[world_rank], 1, MPI_INT, max_spks, 1, MPI_INT, MPI_COMM_WORLD);
-		MPI_Allgather (&max_spksizes[world_rank], 1, MPI_INT, max_spksizes, 1, MPI_INT, MPI_COMM_WORLD);
-		MPI_Allgather (&max_kmers[world_rank], 1, MPI_INT, max_kmers, 1, MPI_INT, MPI_COMM_WORLD);
+		max_num_spks = max_spks[world_rank];
+		max_spksize = max_spksizes[world_rank];
+		max_num_kmers = max_kmers[world_rank];
+		MPI_Allgather (&max_num_spks, 1, MPI_INT, max_spks, 1, MPI_INT, MPI_COMM_WORLD);
+		MPI_Allgather (&max_spksize, 1, MPI_INT, max_spksizes, 1, MPI_INT, MPI_COMM_WORLD);
+		MPI_Allgather (&max_num_kmers, 1, MPI_INT, max_kmers, 1, MPI_INT, MPI_COMM_WORLD);
 	}
 	max_num_kmers = 0;
 	max_num_spks = 0;
