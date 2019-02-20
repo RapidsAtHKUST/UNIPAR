@@ -1693,7 +1693,7 @@ gather_sorted_dbgraph (dbgraph_t * graph, dbtable_t * tbs, subgraph_t * subgraph
 	factor = my_round(factor, 3) + MSSG_ROUNDUP;
 	if (factor > mssg_factor)
 		mssg_factor = factor;
-//	if (pid == np_node - 1)
+	if (pid == np_node - 1)
 	{
 		printf ("partition %d: number of vertices: %u\n", pid, countn);
 		printf ("MMMMMMMMMMMMMMMMMMMMMMMMMMMMM MSSG FACTOR REPORT::::::::::::::::\n");

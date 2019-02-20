@@ -246,7 +246,7 @@ static void push_mssg_offset_lr_cpu (uint size, int num_of_partitions, int curr_
 		uint size_per_th = (size + nth - 1)/nth;
 		if (size_per_th <= nth)
 		{
-			printf ("CCCCCCCCCCCcareful about size!\n");
+//			printf ("CCCCCCCCCCCcareful about size!\n");
 			size_per_th = size/nth;
 		}
 		uint size_th;
@@ -305,7 +305,7 @@ static void push_mssg_lr_cpu (uint size, int num_of_partitions, int curr_pid, vo
 		uint size_per_th = (size + nth - 1)/nth;
 		if (size_per_th <= nth)
 		{
-			printf ("CCCCCCCCCCCcareful about size!\n");
+//			printf ("CCCCCCCCCCCcareful about size!\n");
 			size_per_th = size/nth;
 		}
 		uint size_th;
