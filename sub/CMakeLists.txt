@@ -49,7 +49,7 @@ find_package("CUDA" REQUIRED)
     macro(cuda_add_compile_options options)
         list(APPEND CUDA_NVCC_FLAGS "${options}")
     endmacro()
-    cuda_add_compile_options("-gencode arch=compute_35,code=sm_35 -Xptxas -dlcm=cg")
+    cuda_add_compile_options("--gpu-architecture=sm_35 -Xptxas -dlcm=cg")
     cuda_add_compile_options("-std=c++11 -g -O3 -lpthread")
     cuda_add_compile_options("-Xcompiler ${OpenMP_CXX_FLAGS}")
 

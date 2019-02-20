@@ -43,7 +43,7 @@ find_package("CUDA" REQUIRED)
     macro(cuda_add_compile_options options)
         list(APPEND CUDA_NVCC_FLAGS "${options}")
     endmacro()
-    cuda_add_compile_options("-gencode arch=compute_35,code=sm_35 -Xptxas -dlcm=cg")
+    cuda_add_compile_options("--gpu-architecture=sm_35 -Xptxas -dlcm=cg")
     cuda_add_compile_options("-std=c++11 -g -G -lpthread")
     cuda_add_compile_options("-Xcompiler ${OpenMP_CXX_FLAGS}")
     
@@ -53,6 +53,7 @@ cuda_add_library(culib SHARED
 
 link_directories(${CMAKE_BINARY_DIR}/hash)
 link_directories(${CMAKE_BINARY_DIR}/sub)
+target_link_libraries(unipar /home/sqiuac/.linuxbrew/lib/librt.so.1)   
 target_link_libraries(unipar ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(unipar tbbsort)
 target_link_libraries(unipar distribute)
