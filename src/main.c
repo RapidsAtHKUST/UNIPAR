@@ -117,7 +117,7 @@ main (int argc, char ** argv)
 	int num_of_hash_devices = get_device_config();
 	int k;
 	int p=0;
-	float factor = 0.8;
+	float factor = 1;
 	if (get_opt(argc, argv, input_file, &read_length, &k, &p, &num_of_partitions, \
 			&num_of_hash_cpus, &num_of_hash_devices, msp_dir, contig_dir, &cutoff, &factor, &mpi_run) != 0)
 	{

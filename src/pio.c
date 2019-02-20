@@ -19,7 +19,7 @@
 
 #define THREADS_MSP_OUTPUT THREADS_MSP_COMPUTE // parallel output threads should be the same number of parallel compute
 #define THREADS_MSP_META THREADS_MSP_COMPUTE // parallel output threads should be the same number of parallel compute
-#define THREADS_WRITE_GRAPH 24
+#define THREADS_WRITE_GRAPH 128
 
 #define MAX_IO_THREADS 1
 #define MSSG_ROUNDUP 0.1 // should be set higher when each processor only contains a small number of partitions
@@ -1497,7 +1497,7 @@ write_graph (dbgraph_t * graph, int k)
 	int sum;
 	uint total_edges = 0;
 	uint total_distinct_edges = 0;
-	omp_set_num_threads (THREADS_WRITE_GRAPH);
+	omp_set_num_threads (cpu_threads);
 #pragma omp parallel private(i, j, sum) reduction(+:countn) reduction(+:total_edges) reduction(+:total_distinct_edges)
 	{
 		int thid = omp_get_thread_num ();
@@ -1505,11 +1505,11 @@ write_graph (dbgraph_t * graph, int k)
 		uint local_countn = 0;
 		uint num_edges = 0;
 		uint distinct_num_edges = 0;
-		uint size_per_thread = (size + THREADS_WRITE_GRAPH - 1) / THREADS_WRITE_GRAPH;
-		if (size_per_thread <= THREADS_WRITE_GRAPH)
-			size_per_thread = size / THREADS_WRITE_GRAPH;
+		uint size_per_thread = (size + cpu_threads - 1) / cpu_threads;
+		if (size_per_thread <= cpu_threads)
+			size_per_thread = size / cpu_threads;
 		node_t * local_nodes = nodes + size_per_thread * thid;
-		if (thid == THREADS_WRITE_GRAPH - 1)
+		if (thid == cpu_threads - 1)
 			size_per_thread = size - size_per_thread * (thid);
 		if (size - size_per_thread * thid < 0)
 			printf ("ATTENTION!!! size_per_thread error!!! %ld\n", size - size_per_thread);
@@ -1584,12 +1584,12 @@ gather_sorted_dbgraph (dbgraph_t * graph, dbtable_t * tbs, subgraph_t * subgraph
 	uint total_distinct_edges = 0;
 	voff_t vs_offsets[THREADS_WRITE_GRAPH+1];
 	memset (vs_offsets, 0, sizeof(voff_t) * (THREADS_WRITE_GRAPH+1));
-	omp_set_num_threads (THREADS_WRITE_GRAPH);
+	omp_set_num_threads (cpu_threads);
 #pragma omp parallel private(i, j, sum) reduction(+:countn) reduction(+:total_edges) reduction(+:total_distinct_edges)
 	{
 		int thid = omp_get_thread_num ();
 		int nths = omp_get_num_threads ();
-		if (nths != THREADS_WRITE_GRAPH)
+		if (nths != cpu_threads)
 		{
 			printf ("Error in setting threads for gathering dbgraph!\n");
 			exit(0);
@@ -1598,11 +1598,11 @@ gather_sorted_dbgraph (dbgraph_t * graph, dbtable_t * tbs, subgraph_t * subgraph
 		uint local_countn = 0;
 		uint num_edges = 0;
 		uint distinct_num_edges = 0;
-		uint size_per_thread = (size + THREADS_WRITE_GRAPH - 1) / THREADS_WRITE_GRAPH;
-		if (size_per_thread <= THREADS_WRITE_GRAPH)
-			size_per_thread = size / THREADS_WRITE_GRAPH;
+		uint size_per_thread = (size + cpu_threads - 1) / cpu_threads;
+		if (size_per_thread <= cpu_threads)
+			size_per_thread = size / cpu_threads;
 		node_t * local_nodes = nodes + size_per_thread * thid;
-		if (thid == THREADS_WRITE_GRAPH - 1)
+		if (thid == cpu_threads - 1)
 			size_per_thread = size - size_per_thread * (thid);
 		if (size - size_per_thread * thid < 0)
 			printf ("ATTENTION!!! size_per_thread error!!! %ld\n", size - size_per_thread);
@@ -1645,23 +1645,23 @@ gather_sorted_dbgraph (dbgraph_t * graph, dbtable_t * tbs, subgraph_t * subgraph
 	tbs[pid].num_elems = num_of_kmers;
 	(subgraph->subgraphs)[pid].size = countn;
 	(subgraph->subgraphs)[pid].id = pid + start_pid;
-	inclusive_prefix_sum (vs_offsets, THREADS_WRITE_GRAPH+1);
+	inclusive_prefix_sum (vs_offsets, cpu_threads+1);
 
-	omp_set_num_threads (THREADS_WRITE_GRAPH);
+	omp_set_num_threads (cpu_threads);
 #pragma omp parallel
 	{
 		int thid = omp_get_thread_num ();
 		int nths = omp_get_num_threads ();
-		if (nths != THREADS_WRITE_GRAPH)
+		if (nths != cpu_threads)
 		{
 			printf ("Error in setting threads for gathering dbgraph!\n");
 			exit(0);
 		}
-		uint size_per_thread = (size + THREADS_WRITE_GRAPH - 1) / THREADS_WRITE_GRAPH;
-		if (size_per_thread <= THREADS_WRITE_GRAPH)
-			size_per_thread = size / THREADS_WRITE_GRAPH;
+		uint size_per_thread = (size + cpu_threads - 1) / cpu_threads;
+		if (size_per_thread <= cpu_threads)
+			size_per_thread = size / cpu_threads;
 		node_t * local_nodes = nodes + size_per_thread * thid;
-		if (thid == THREADS_WRITE_GRAPH - 1)
+		if (thid == cpu_threads - 1)
 			size_per_thread = size - size_per_thread * (thid);
 		voff_t gather_start = vs_offsets[thid];
 		entry_t * vs = tbs[pid].buf + gather_start;
