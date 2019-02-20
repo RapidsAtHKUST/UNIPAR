@@ -25,13 +25,13 @@ void usage (void)
 			"\t-r [INT]: read length, the first r number of base pairs in a read will be taken\n"
 			"\t-k [INT]: kmer length, no longer than the read length\n\n"
 			"\tThe following parameters are optional, and can be omitted:::::::::::::::::::::\n\n"
-			"\t-n [INT]: [Optional] number of partitions, set to be 512 by default\n"
-			"\t-c [INT]: [Optional] number of CPUs to run, either 0 or 1, set to be 1 by default\n"
-			"\t-g [INT]: [Optional] number of GPUs to run, either set to be 0 or the maximum number of GPUs in this system, \n"
+			"\t-n [INT]: [Optional] number of partitions, set to 512 by default\n"
+			"\t-c [INT]: [Optional] number of CPUs to run, either 0 or 1, set to 1 by default\n"
+			"\t-g [INT]: [Optional] number of GPUs to run, either set to 0 or the maximum number of GPUs in this system, \n"
 			"\t\t             set to be the maximum number of GPUs detected\n"
-			"\t-d [STRING]: [Optional] intermediate partitioning output directory, set to be ./partitions by default\n"
+			"\t-d [STRING]: [Optional] intermediate partitioning output directory, set to ./partitions by default\n"
 			"\t-o [STRING]: [Optional] unitig output directory, set to be the current directory by default\n"
-			"\t-t [INT]: [Optional] The cutoff threshold for the number of kmer coverage, set to 2 by default\n\n\n");
+			"\t-t [INT]: [Optional] The cutoff threshold for the number of kmer coverage, set to 1 by default\n\n\n");
 }
 
 int get_opt (int argc, char * const argv[], char * input, int * r, int * k, int * p, int * n, int * c, int * g, \

@@ -199,6 +199,10 @@ main (int argc, char ** argv)
 			strcpy (hash_dir, cwd);
 		}
 	}
+	else
+	{
+		strcpy (hash_dir, msp_dir);
+	}
 
 	if (world_rank == 0)
 	{
