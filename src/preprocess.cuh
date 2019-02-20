@@ -15,7 +15,7 @@
 #include "hash.cuh"
 
 #define MAX_NUM_BLOCKS 1024 // for performance, setting it to be 1024; the maximum number of blocks in GPU can be at least 4096
-#define THREADS_PER_BLOCK_NODES 1024
+#define THREADS_PER_BLOCK_NODES 512 //1024 does not work on volta 100
 #define TOTAL_THREADS_NODES (THREADS_PER_BLOCK_NODES * MAX_NUM_BLOCKS)
 
 #ifdef LITTLE_ENDIAN
