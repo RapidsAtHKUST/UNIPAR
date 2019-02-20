@@ -352,7 +352,7 @@ void * master_all2all_async (void * arg)
 			mpi_allsum (&local_sum, &global_sum);
 		if (global_sum == 0)
 			cmm_arg->num_mssgs = total_intra_mssgs;
-		cmm_arg->num_mssgs = global_sum;
+		else cmm_arg->num_mssgs = global_sum;
 
 		for (i=0; i<num_of_procs; i++)
 		{
