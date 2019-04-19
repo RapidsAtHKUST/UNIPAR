@@ -14,7 +14,7 @@ MPI library
 *tbb library* used for parallel sort and scan on CPUs
 
 ## Build UNIPAR:
-git clone git@github.com:ShuangQiuac/UNIPAR.git
+git clone https://github.com/ShuangQiuac/UNIPAR
 
 cd &lt;PATH_TO_UNIPAR&gt;
 
@@ -49,15 +49,15 @@ mpirun -np 2 ./unipar -i &lt;PATH_TO_UNIPAR&gt;/example/test.fa -r 36 -k 27
 
 **-n** [*INT*]: [Optional] number of partitions, set to be 512 by default, suggestted to be a number of power of 2
 
-**-c** [*INT*]: [Optional] number of CPUs to run, either 0 or 1, set to be 1 by default
+**-c** [*INT*]: [Optional] number of CPUs to run, either 0 or 1, set to 1 by default
 
-**-g** [*INT*]: [Optional] number of GPUs to run, either set to be 0 or the number of GPUs detected with UNIPAR, set to be the number of GPUs detected by default
+**-g** [*INT*]: [Optional] number of GPUs to run, either set to 0 or the number of GPUs detected with UNIPAR, set to the number of GPUs detected by default
 
-**-d** [*STRING*]: [Optional] intermediate output directory for partitions, set to be ./partitions by default
+**-d** [*STRING*]: [Optional] intermediate output directory for partitions, set to ./partitions by default
 
-**-o** [*STRING*]: [Optional] unitig output directory, set to be the current directory by default
+**-o** [*STRING*]: [Optional] unitig output directory, set to the current directory by default
 
-**-t** [*INT*]: [Optional] the cutoff threshold for the number of kmer coverage, set to be 1 by default
+**-t** [*INT*]: [Optional] the cutoff threshold for kmer coverage, set to 1 by default
 
 
 ## Output files:
