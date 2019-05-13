@@ -76,4 +76,13 @@ Format: contig_&lt;processor id&gt;_&lt;process id&gt;.fa
 
 Unitigs in all the files contributes to the final results.
 
+## Tested Datasets:
+**Ecoli** on SRA (SRR001665) https://www.ncbi.nlm.nih.gov/sra/?term=SRR001665
+**Human Chr14** on GAGE: http://gage.cbcb.umd.edu/data/Hg_chr14/ 
+**Bumbblebee** on GAGE http://gage.cbcb.umd.edu/data/Rhodobacter_sphaeroides/
+**Whole Human Genomes** on SRA (SRX016231) https://www.ncbi.nlm.nih.gov/sra?term=SRX016231
 
+## Tested Machine Configuration:
+**GPU** Nvidia K80, Nvidia P40
+**Total number of GPUs** Upto 24 (2\*12 K40)
+**Total number of Computer Nodes** Upto 6
