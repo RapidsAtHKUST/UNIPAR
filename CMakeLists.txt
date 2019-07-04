@@ -53,7 +53,6 @@ cuda_add_library(culib SHARED
 
 link_directories(${CMAKE_BINARY_DIR}/hash)
 link_directories(${CMAKE_BINARY_DIR}/sub)
-target_link_libraries(unipar /home/sqiuac/.linuxbrew/lib/librt.so.1)   
 target_link_libraries(unipar ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(unipar tbbsort)
 target_link_libraries(unipar distribute)
